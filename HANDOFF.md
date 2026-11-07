@@ -474,3 +474,10 @@ To build custom programs we can *verify* before sending (instead of guessing and
 - **Done:** firmware obtained, hardware identified, memory map cracked, functions now disassemblable.
 - **Next:** (a) find the program loader → entry convention; (b) dump the `0x20000f47` service table → full capability list; (c) stand up T18Emu to run/verify a custom program before it ever touches the device.
 - Only after (c) should any hand-written program be sent to a real Tama.
+
+### Loader findings (magic-green dump)
+
+- The firmware's **download verifier** is at RAM `0x2012efcc` and `0x2014c656` (Thumb). It confirms a downloaded program is placed at **`0x207F0000`**, reads the big-endian **code size at item offset `0xae`**, and runs the `0x207F0000..+size` range through several checks.
+- `0x2012f68c` is a **call veneer** (`bx r3; bx r4; ...`), so the loader's "constants" (`0x2013fa15`, `0x201583fb`, `0x2001448c`, ...) are firmware functions called indirectly. Finding the final "enter the program" jump means following that indirect-call chain — better done in an emulator than by hand.
+- **Practical takeaway:** reading firmware instructions by hand has hit diminishing returns. The next leap (entry convention, the `0x20000f47` service table, and writing a program we can verify) wants a **running emulator** (Paramix T18Emu) as the platform. That's a separate, larger setup task.
+
