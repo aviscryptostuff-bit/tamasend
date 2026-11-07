@@ -435,3 +435,42 @@ Takes a resource ID in r0 and returns a pointer into firmware data. IDs seen: `0
 
 - `tools/disasm_item.py` — annotated ARM disassembly of a location/game file.
 - The API/resource analysis scripts live in the session scratchpad (`re_api.py`, `re_res.py`); fold them into `tools/` when continuing.
+
+## 12. The firmware itself (the foundation for verified custom code)
+
+To build custom programs we can *verify* before sending (instead of guessing and risking the device), we need the firmware. Found it 2026-11-07.
+
+### Hardware (from the kaero/t-on datasheets)
+
+- **Main chip:** GeneralPlus **GPEL3101A**, **ARM7TDMI** core (datasheet DDI0029). This confirms our item programs are ARM/Thumb — correct.
+- **Bluetooth:** TI **CC2650**. **Flash:** GigaDevice **GD25Q64** (8 MB SPI). **EEPROM:** 24C128.
+- Dumping is done by soldering to test points and reading the SPI flash with a minipro (`minipro -p GD25Q64C -r dump.bin`). Test-point map is in the repo.
+
+### Where to get it
+
+- **Community RE project:** `github.com/kaero/t-on` — two real 8 MB SPI flash dumps (magic-green, fairy-blue), the datasheets, and an **online firmware viewer** at kaero.github.io/t-on.
+- The official archive.org SPI dump collection is **dark** (taken down — do not chase mirrors).
+- **Do not commit the firmware binary to this repo** — it's Bandai's copyrighted code. Analyze it locally; only facts/notes go in the repo.
+- Emulator for verifying programs: **Paramix Studio / T18Emu** (`github.com/mameise/Paramix-Studio`) — ships no ROM; you supply your own dump.
+
+### Flash layout (magic-green dump)
+
+| Flash offset | Contents |
+|---|---|
+| `0x000000` | 8-byte header `"SPII"` + load addr `0x2000000c`, then the ARM vector table |
+| `0x00000c`.. | **firmware code**, runs at RAM `0x20000000` |
+| ~`0x1b0000` | item / save storage (TAMAGO blocks) |
+| ~`0x4e9000` | built-in **item catalogue** (TAMAGO + `tg18_` IDs, like MyMeets' assets) |
+
+### The key that unlocks disassembly
+
+**RAM address `0x2000XXXX` = flash offset `0x0c + 0xXXXX`.** Verified: the reset vector at RAM `0x20000020` holds `0x20000048`, and the firmware functions disassemble as valid Thumb at the mapped offsets. So every firmware function our programs call (`0x200008ff`, `0x20000f47`, …) can now be read directly.
+
+- `0x20000f47` is not a plain loader: it's a **dispatch function** (`bl helper; ldr r3,[table, r0*4]; mov pc,r3`). r0 selects a firmware service/resource. Reading that table enumerates what programs can reach — the real capability map.
+- The firmware references the downloaded-program base `0x207F0000` at two code sites (near RAM `0x2012f040`, `0x2014c7a4`). Disassembling the code that uses those literals gives the **entry convention** for a downloaded location/game — the last missing piece before we can write our own program and verify it in the emulator.
+
+### Honest status
+
+- **Done:** firmware obtained, hardware identified, memory map cracked, functions now disassemblable.
+- **Next:** (a) find the program loader → entry convention; (b) dump the `0x20000f47` service table → full capability list; (c) stand up T18Emu to run/verify a custom program before it ever touches the device.
+- Only after (c) should any hand-written program be sent to a real Tama.
