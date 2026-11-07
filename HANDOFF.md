@@ -392,3 +392,46 @@ The owner remembered a **"time potion"** from the **Magic Hut** that grows a Tam
 2. Compare against a "Save my Tama's data" dump from a Visit. The visit reply probably carries some of the same pet variables.
 3. Build our own location ("TamaOS Lab"): reuse Bolter's helpers and API calls, with our own menu, for example "grow up", "max coins", "full stats", or set any variable. This needs an ARM assembler (`arm-none-eabi-as`, or a small Python assembler). How the firmware enters the code at 0x204 still needs mapping, by comparing the official station and game files.
 4. **Risk:** custom code runs with full access to the Tama. A bad write can corrupt the save; a reset should recover it, but that's unverified. Test changes one at a time.
+
+## 11. Firmware API map (toward our own programs)
+
+This is static analysis of the location/game files we have (official + Bolter's). We do **not** have the firmware image, so we can name functions only by how the programs use them.
+
+### The firmware function table
+
+Every program is ARM code at 0x207F0204 that calls fixed firmware entry points in `0x2000xxxx` / `0x20003xxx` via `ldr r3,=addr; mov lr,pc; bx r3`. Across all 11 files, only ~30 distinct entry points are ever called — this is the whole known API surface. `tools/re_api.py`-style analysis (see scratch) counted the calls:
+
+| Address | Calls | Likely meaning |
+|---|---|---|
+| `0x20000425/31/3d` | ~18 | read the three buttons (A/B/C) |
+| `0x20000449/55/61` | ~21 | button beeps (always r0=0) |
+| `0x20000499` | 3 | random number |
+| `0x2000063f` | 10 | wait, r0 = milliseconds (0x320=800, 0x20=32) |
+| `0x200008ff` | 71 | draw a sprite |
+| `0x2000091f` | 93 | draw a sprite at an X position |
+| `0x20000933` | 249 | draw / refresh a frame (r0=500 almost always) |
+| `0x20000a37` | 88 | select draw layer (mostly r0=1) |
+| `0x20000f47` | 73 | **load firmware resource by ID** → pointer |
+| `0x20003b0f/c93/d41` | ~170 | lower-level screen / pixel ops |
+| rare: `0x5ef,0x603,0x6ff,0x713,0x89f,0x9c7,0xa9b` | 1 each | used by a single game — unexplored |
+
+### The resource loader (0x20000f47)
+
+Takes a resource ID in r0 and returns a pointer into firmware data. IDs seen: `0x1c, 0x37, 0x79, 0x114, 0x115, 0x378, 0x774, 0x789`. The Magic Hut sums the bytes of resources `0x37` and `0x774` to fingerprint the firmware region (JP vs EN). The ID range implies the firmware holds ~2000 internal resources (sprites, tables, sounds) that a program can pull — this is the main unmapped "content space".
+
+### The pet save (how cheats work)
+
+- Pet data pointer: `*(u32*)0x200004D4`.
+- Variables at pointer+offset, from the table at file 0x1E44 (see section 10): growth stage (offset 0x36), Gotchi Points (0x20), happiness (0x11), hunger (0x05), etc.
+- Helpers in magic_hut.txt: get8 0x490 / get16 0x4A8 / get32 0x4C0, set8 0x43C / set16 0x458 / set32 0x474.
+
+### What this unlocks, and the honest ceiling
+
+- **Now (no new access):** write our own location/game that calls these ~30 functions in new combinations — our own menus, cheats with our own values (the Cheat Hut already does this by patching), and loading firmware resources by ID.
+- **Needs a device to experiment on:** what each of the ~2000 resource IDs actually is, and what the rare functions do. The way to learn this is a **resource probe**: a tiny, safe program that loads resource N, draws it, and lets you step N with the buttons — turning the Tama itself into the lab. This reads and draws only; it writes nothing to the save.
+- **Needs the firmware image:** finding functions beyond the ~30 (direct sound synthesis, spawning characters, etc.). That requires a hardware dump of the chip or the firmware binary from elsewhere.
+
+### Tools
+
+- `tools/disasm_item.py` — annotated ARM disassembly of a location/game file.
+- The API/resource analysis scripts live in the session scratchpad (`re_api.py`, `re_res.py`); fold them into `tools/` when continuing.
