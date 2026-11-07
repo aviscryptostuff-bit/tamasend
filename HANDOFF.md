@@ -34,6 +34,8 @@ TamaOS sends custom content to a Tamagotchi On / Meets over Bluetooth Low Energy
 
 ---
 
+**Confirmed on the device (2026-11-07):** a marriage from the Marry tab worked. The Tama showed a baby and asked for a name, which is the normal result of a marriage. Still to confirm: which mode was used, and whether the Experimental (not adult) switch was on.
+
 ## 1. Goal and direction
 
 - The owner wants the Tama to become something "completely different than the base Tama idea": a custom gadget, not a pet. It should be something nobody else has done.
@@ -390,3 +392,137 @@ The owner remembered a **"time potion"** from the **Magic Hut** that grows a Tam
 2. Compare against a "Save my Tama's data" dump from a Visit. The visit reply probably carries some of the same pet variables.
 3. Build our own location ("TamaOS Lab"): reuse Bolter's helpers and API calls, with our own menu, for example "grow up", "max coins", "full stats", or set any variable. This needs an ARM assembler (`arm-none-eabi-as`, or a small Python assembler). How the firmware enters the code at 0x204 still needs mapping, by comparing the official station and game files.
 4. **Risk:** custom code runs with full access to the Tama. A bad write can corrupt the save; a reset should recover it, but that's unverified. Test changes one at a time.
+
+## 11. Firmware API map (toward our own programs)
+
+This is static analysis of the location/game files we have (official + Bolter's). We do **not** have the firmware image, so we can name functions only by how the programs use them.
+
+### The firmware function table
+
+Every program is ARM code at 0x207F0204 that calls fixed firmware entry points in `0x2000xxxx` / `0x20003xxx` via `ldr r3,=addr; mov lr,pc; bx r3`. Across all 11 files, only ~30 distinct entry points are ever called — this is the whole known API surface. `tools/re_api.py`-style analysis (see scratch) counted the calls:
+
+| Address | Calls | Likely meaning |
+|---|---|---|
+| `0x20000425/31/3d` | ~18 | read the three buttons (A/B/C) |
+| `0x20000449/55/61` | ~21 | button beeps (always r0=0) |
+| `0x20000499` | 3 | random number |
+| `0x2000063f` | 10 | wait, r0 = milliseconds (0x320=800, 0x20=32) |
+| `0x200008ff` | 71 | draw a sprite |
+| `0x2000091f` | 93 | draw a sprite at an X position |
+| `0x20000933` | 249 | draw / refresh a frame (r0=500 almost always) |
+| `0x20000a37` | 88 | select draw layer (mostly r0=1) |
+| `0x20000f47` | 73 | **load firmware resource by ID** → pointer |
+| `0x20003b0f/c93/d41` | ~170 | lower-level screen / pixel ops |
+| rare: `0x5ef,0x603,0x6ff,0x713,0x89f,0x9c7,0xa9b` | 1 each | used by a single game — unexplored |
+
+### The resource loader (0x20000f47)
+
+Takes a resource ID in r0 and returns a pointer into firmware data. IDs seen: `0x1c, 0x37, 0x79, 0x114, 0x115, 0x378, 0x774, 0x789`. The Magic Hut sums the bytes of resources `0x37` and `0x774` to fingerprint the firmware region (JP vs EN). The ID range implies the firmware holds ~2000 internal resources (sprites, tables, sounds) that a program can pull — this is the main unmapped "content space".
+
+### The pet save (how cheats work)
+
+- Pet data pointer: `*(u32*)0x200004D4`.
+- Variables at pointer+offset, from the table at file 0x1E44 (see section 10): growth stage (offset 0x36), Gotchi Points (0x20), happiness (0x11), hunger (0x05), etc.
+- Helpers in magic_hut.txt: get8 0x490 / get16 0x4A8 / get32 0x4C0, set8 0x43C / set16 0x458 / set32 0x474.
+
+### What this unlocks, and the honest ceiling
+
+- **Now (no new access):** write our own location/game that calls these ~30 functions in new combinations — our own menus, cheats with our own values (the Cheat Hut already does this by patching), and loading firmware resources by ID.
+- **Needs a device to experiment on:** what each of the ~2000 resource IDs actually is, and what the rare functions do. The way to learn this is a **resource probe**: a tiny, safe program that loads resource N, draws it, and lets you step N with the buttons — turning the Tama itself into the lab. This reads and draws only; it writes nothing to the save.
+- **Needs the firmware image:** finding functions beyond the ~30 (direct sound synthesis, spawning characters, etc.). That requires a hardware dump of the chip or the firmware binary from elsewhere.
+
+### Tools
+
+- `tools/disasm_item.py` — annotated ARM disassembly of a location/game file.
+- The API/resource analysis scripts live in the session scratchpad (`re_api.py`, `re_res.py`); fold them into `tools/` when continuing.
+
+## 12. The firmware itself (the foundation for verified custom code)
+
+To build custom programs we can *verify* before sending (instead of guessing and risking the device), we need the firmware. Found it 2026-11-07.
+
+### Hardware (from the kaero/t-on datasheets)
+
+- **Main chip:** GeneralPlus **GPEL3101A**, **ARM7TDMI** core (datasheet DDI0029). This confirms our item programs are ARM/Thumb — correct.
+- **Bluetooth:** TI **CC2650**. **Flash:** GigaDevice **GD25Q64** (8 MB SPI). **EEPROM:** 24C128.
+- Dumping is done by soldering to test points and reading the SPI flash with a minipro (`minipro -p GD25Q64C -r dump.bin`). Test-point map is in the repo.
+
+### Where to get it
+
+- **Community RE project:** `github.com/kaero/t-on` — two real 8 MB SPI flash dumps (magic-green, fairy-blue), the datasheets, and an **online firmware viewer** at kaero.github.io/t-on.
+- The official archive.org SPI dump collection is **dark** (taken down — do not chase mirrors).
+- **Do not commit the firmware binary to this repo** — it's Bandai's copyrighted code. Analyze it locally; only facts/notes go in the repo.
+- Emulator for verifying programs: **Paramix Studio / T18Emu** (`github.com/mameise/Paramix-Studio`) — ships no ROM; you supply your own dump.
+
+### Flash layout (magic-green dump)
+
+| Flash offset | Contents |
+|---|---|
+| `0x000000` | 8-byte header `"SPII"` + load addr `0x2000000c`, then the ARM vector table |
+| `0x00000c`.. | **firmware code**, runs at RAM `0x20000000` |
+| ~`0x1b0000` | item / save storage (TAMAGO blocks) |
+| ~`0x4e9000` | built-in **item catalogue** (TAMAGO + `tg18_` IDs, like MyMeets' assets) |
+
+### The key that unlocks disassembly
+
+**RAM address `0x2000XXXX` = flash offset `0x0c + 0xXXXX`.** Verified: the reset vector at RAM `0x20000020` holds `0x20000048`, and the firmware functions disassemble as valid Thumb at the mapped offsets. So every firmware function our programs call (`0x200008ff`, `0x20000f47`, …) can now be read directly.
+
+- `0x20000f47` is not a plain loader: it's a **dispatch function** (`bl helper; ldr r3,[table, r0*4]; mov pc,r3`). r0 selects a firmware service/resource. Reading that table enumerates what programs can reach — the real capability map.
+- The firmware references the downloaded-program base `0x207F0000` at two code sites (near RAM `0x2012f040`, `0x2014c7a4`). Disassembling the code that uses those literals gives the **entry convention** for a downloaded location/game — the last missing piece before we can write our own program and verify it in the emulator.
+
+### Honest status
+
+- **Done:** firmware obtained, hardware identified, memory map cracked, functions now disassemblable.
+- **Next:** (a) find the program loader → entry convention; (b) dump the `0x20000f47` service table → full capability list; (c) stand up T18Emu to run/verify a custom program before it ever touches the device.
+- Only after (c) should any hand-written program be sent to a real Tama.
+
+### Loader findings (magic-green dump)
+
+- The firmware's **download verifier** is at RAM `0x2012efcc` and `0x2014c656` (Thumb). It confirms a downloaded program is placed at **`0x207F0000`**, reads the big-endian **code size at item offset `0xae`**, and runs the `0x207F0000..+size` range through several checks.
+- `0x2012f68c` is a **call veneer** (`bx r3; bx r4; ...`), so the loader's "constants" (`0x2013fa15`, `0x201583fb`, `0x2001448c`, ...) are firmware functions called indirectly. Finding the final "enter the program" jump means following that indirect-call chain — better done in an emulator than by hand.
+- **Practical takeaway:** reading firmware instructions by hand has hit diminishing returns. The next leap (entry convention, the `0x20000f47` service table, and writing a program we can verify) wants a **running emulator** (Paramix T18Emu) as the platform. That's a separate, larger setup task.
+
+
+## 13. Emulator and a working cheat verifier (no device)
+
+Found a finished emulator and built a verifier, both with no hardware.
+
+### The emulator exists: nijiiro-egg
+
+`github.com/oreo-fox/nijiiro-egg` is an open-source (MIT) Tamagotchi On/Meets emulator in Rust, with a Python/Unicorn prototype. It runs the real firmware from an 8 MB dump. Reading its code **independently confirmed all of section 11–12**: executes at `0x20000000`, reset PC `0x20000048`, SRAM at `0xF8000000`. It supports "ON Magic (EN)" (the owner's version). Setup guide: `docs/EMULATOR_SETUP.md`. It needs a PC (Windows now, Android planned).
+
+### Firmware boots in a sandbox here
+
+A minimal Unicorn harness (my own code) boots the magic-green dump: it runs from `0x20000048` into the `0x20013xxx` range and reaches the `0xF800xxxx` SRAM init. It then **stalls in a clock/PLL wait** on MMIO `0xD0000000` — expected, because a minimal harness doesn't emulate the chip peripherals. A *full* playable boot is what nijiiro-egg already does; reproducing it is not worth it.
+
+### `tools/verify_cheat.py` — proving a cheat before sending it
+
+The harness **is** enough to run a single item-program routine in isolation and check what it writes. `verify_cheat.py` loads a Magic-Hut-style file at `0x207F0000`, sets up a fake pet and the pet pointer at `0x200004D4`, stubs the item's region-detection, and runs the actual ARM cheat routines. Results (confirmed):
+
+- Original Magic Hut: coins routine writes **99999** to pet `+0x20` (Gotchi Points); stats routine writes happiness **100** to `+0x11` and **6** to `+0x05`.
+- Our Cheat Hut (site) patched to coins 12345 / happiness 77: writes **12345** and **77**. End-to-end match.
+
+**This is the key safety tool:** any custom cheat we build can be run in the sandbox and checked against the intended writes *before* it goes to a real Tama. Needs `pip install unicorn capstone`.
+
+### What this unlocks next (safe, doable here)
+
+1. Extend `verify_cheat.py` into a general item-program runner (stub the ~10 firmware calls from section 11) so whole custom programs can be dry-run.
+2. Write new cheat routines (set any variable, grow-up, etc.), verify them in the sandbox, then expose them in the site's Cheat Hut.
+3. Only send to the device what the verifier has confirmed.
+
+## 14. Full Magic Hut cheat-field map (verified)
+
+Every variable the Magic Hut writes, recovered by disassembling all its routines and cross-checked against nijiiro-egg's notes and the sandbox verifier (`tools/verify_cheat.py`). The pet struct is at `*(0x200004D4)`; offsets are into it.
+
+| Magic Hut var | pet offset | size | meaning | confidence |
+|---|---|---|---|---|
+| var3 | +0x20 | u32 | **Gotchi Points** | high (matches emulator `0xF800D884`) |
+| var0 | +0x05 | u8 | **hunger / fullness** | high (matches emulator `0xF800D869`) |
+| var2 | +0x11 | u8 | **happiness** | high |
+| var4 | +0x36 | u16 | **growth stage** (time potion does +1, cap ~4) | high |
+| var1 | +0x0c | u8 | **evolve trigger** (set, then cleared) | med |
+| var10 | +0x372 | u8 | toggle (bit 0) — unknown effect | low |
+| var11 | +0x404 | u8 | written + mirrored to `0xF800C058/60` — unknown | low |
+
+The site's **Cheat Hut** (Custom tab) now patches the high-confidence ones to any value — **coins, happiness, hunger** — reusing Bolter's proven code (only the value immediates change: coins `0x7a0`, happiness `0x600`, hunger `0x60c`), with the checksum fixed. Each build is checked in the sandbox before it's considered good.
+
+The time/growth potion (var4 +1) and the two unknown toggles ride along in the same file (they're Bolter's untouched routines). Setting growth to an exact stage, or decoding the unknowns/age/weight/character, needs either custom code injected into a routine (doable with the verifier, not yet done) or the full emulator to watch the effect.
