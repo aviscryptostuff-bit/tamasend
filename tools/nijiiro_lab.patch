@@ -1,0 +1,194 @@
+diff --git a/core/src/bin/tg18cli.rs b/core/src/bin/tg18cli.rs
+index 58c97c5..cdc9c65 100644
+--- a/core/src/bin/tg18cli.rs
++++ b/core/src/bin/tg18cli.rs
+@@ -35,6 +35,23 @@ fn main() {
+     let mut trace = false;
+     let mut quiet = false;
+     let mut dumps: Vec<(u32, u32)> = Vec::new();
++    // TamaOS lab additions: --poke T:ADDR:HEXBYTES (once, at T s)
++    // and --force ADDR:HEXBYTES:T0:T1 (rewritten every ~0.1 ms between T0 and T1)
++    let mut pokes: Vec<(f64, u32, Vec<u8>)> = Vec::new();
++    let mut forces: Vec<(u32, Vec<u8>, f64, f64)> = Vec::new();
++    let mut shots: Vec<(f64, String)> = Vec::new();
++    // --run-prog T:FILE : load a location/game item at 0x207F0000 and call its
++    // entry (0x207F0000 + BE u32 at 0xAE) from the running game at T s
++    let mut prog: Option<(f64, String)> = None;
++    // --load ADDR:FILE (poke a file into memory at start)
++    // --call T:ADDR:R0:R1:R2 (call a Thumb firmware function from the running game)
++    let mut loads: Vec<(u32, String)> = Vec::new();
++    let mut calls: Vec<(f64, u32, [u32; 3])> = Vec::new();
++    let mut every: Option<(f64, String)> = None;
++    let hexbytes = |s: &str| -> Vec<u8> {
++        (0..s.len() / 2).map(|k| u8::from_str_radix(&s[2 * k..2 * k + 2], 16).unwrap_or_else(|_| usage())).collect()
++    };
++    let hexaddr = |s: &str| u32::from_str_radix(s.trim_start_matches("0x"), 16).unwrap_or_else(|_| usage());
+     let mut i = 0;
+     let next = |i: &mut usize| -> String {
+         *i += 1;
+@@ -69,6 +86,52 @@ fn main() {
+                 let a = u32::from_str_radix(a.trim_start_matches("0x"), 16).unwrap_or_else(|_| usage());
+                 dumps.push((a, n.parse().unwrap_or_else(|_| usage())));
+             }
++            "--poke" => {
++                let spec = next(&mut i);
++                let p: Vec<&str> = spec.split(':').collect();
++                if p.len() != 3 {
++                    usage()
++                }
++                pokes.push((p[0].parse().unwrap_or_else(|_| usage()), hexaddr(p[1]), hexbytes(p[2])));
++            }
++            "--force" => {
++                let spec = next(&mut i);
++                let p: Vec<&str> = spec.split(':').collect();
++                if p.len() != 4 {
++                    usage()
++                }
++                forces.push((hexaddr(p[0]), hexbytes(p[1]), p[2].parse().unwrap_or_else(|_| usage()), p[3].parse().unwrap_or_else(|_| usage())));
++            }
++            "--shot" => {
++                // --shot T:FILE.png  screenshot at T s
++                let spec = next(&mut i);
++                let (t, f) = spec.split_once(':').unwrap_or_else(|| usage());
++                shots.push((t.parse().unwrap_or_else(|_| usage()), f.to_string()));
++            }
++            "--run-prog" => {
++                let spec = next(&mut i);
++                let (t, f) = spec.split_once(':').unwrap_or_else(|| usage());
++                prog = Some((t.parse().unwrap_or_else(|_| usage()), f.to_string()));
++            }
++            "--load" => {
++                let spec = next(&mut i);
++                let (a, f) = spec.split_once(':').unwrap_or_else(|| usage());
++                loads.push((hexaddr(a), f.to_string()));
++            }
++            "--call" => {
++                let spec = next(&mut i);
++                let p: Vec<&str> = spec.split(':').collect();
++                if p.len() != 5 {
++                    usage()
++                }
++                calls.push((p[0].parse().unwrap_or_else(|_| usage()), hexaddr(p[1]), [hexaddr(p[2]), hexaddr(p[3]), hexaddr(p[4])]));
++            }
++            "--every" => {
++                // --every DT:PREFIX  screenshot every DT s to PREFIX_NNNN.png
++                let spec = next(&mut i);
++                let (t, f) = spec.split_once(':').unwrap_or_else(|| usage());
++                every = Some((t.parse().unwrap_or_else(|_| usage()), f.to_string()));
++            }
+             "-h" | "--help" => usage(),
+             a if !a.starts_with("--") && image_path.is_none() => image_path = Some(a.to_string()),
+             _ => usage(),
+@@ -131,7 +194,94 @@ fn main() {
+     }
+     let end = m.executed + insns;
+     let wall = Instant::now();
+-    let outcome = m.run_with_sleep(end);
++    for (a, f) in &loads {
++        let data = std::fs::read(f).expect("load file");
++        m.sys.poke(*a, &data);
++        println!("[lab] loaded {} ({} bytes) at {:08X}", f, data.len(), a);
++    }
++    let flash_before = m.sys.ram[..tg18::FLASH_SIZE].to_vec();
++    const SPIN: u32 = 0x20F0_0000; // RAM above the flash: "b ." lands here on return
++    let mut injected: Option<tg18::cpu::Cpu> = None;
++    let mut next_every = 0.0;
++    let mut every_n = 0;
++    let outcome = if pokes.is_empty() && forces.is_empty() && shots.is_empty() && prog.is_none() && every.is_none() {
++        m.run_with_sleep(end)
++    } else {
++        // run in small slices so pokes/forces/shots land at the right time
++        let slice = (CPU_HZ / 10_000.0) as u64; // 0.1 ms
++        pokes.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
++        shots.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
++        let (mut pi, mut si) = (0, 0);
++        let mut out = Outcome::Limit;
++        while m.executed < end {
++            let t = m.now() - t0;
++            while pi < pokes.len() && pokes[pi].0 <= t {
++                m.sys.poke(pokes[pi].1, &pokes[pi].2);
++                println!("[lab] t={:.3} poke {:08X} <- {:02X?}", t, pokes[pi].1, pokes[pi].2);
++                pi += 1;
++            }
++            for f in &forces {
++                if t >= f.2 && t <= f.3 {
++                    m.sys.poke(f.0, &f.1);
++                }
++            }
++            while si < shots.len() && shots[si].0 <= t {
++                tg18::png::write(&shots[si].1, 128, 128, &m.lcd_rgb(), 3).expect("shot");
++                println!("[lab] t={:.3} screenshot {}", t, shots[si].1);
++                si += 1;
++            }
++            if let Some((pt, file)) = &prog {
++                if injected.is_none() && t >= *pt && m.cpu.mode() != tg18::cpu::MODE_IRQ && m.cpu.cpsr & tg18::cpu::FLAG_I == 0 {
++                    let item = std::fs::read(file).expect("program file");
++                    let entry = u32::from_be_bytes([item[0xAE], item[0xAF], item[0xB0], item[0xB1]]);
++                    m.sys.poke(0x207F_0000, &item);
++                    m.sys.poke(SPIN, &0xEAFF_FFFEu32.to_le_bytes()); // b .
++                    injected = Some(m.cpu.clone());
++                    let sp = (m.cpu.r[13].wrapping_sub(0x800)) & !7;
++                    m.cpu.r[13] = sp;
++                    m.cpu.r[14] = SPIN;
++                    m.cpu.r[15] = 0x207F_0000 + entry;
++                    m.cpu.cpsr &= !tg18::cpu::FLAG_T;
++                    println!("[lab] t={:.3} run-prog {} entry {:08X} (sp {:08X}, mode {:02X})", t, file, 0x207F_0000 + entry, sp, m.cpu.mode());
++                    prog = None;
++                }
++            }
++            if injected.is_none() && !calls.is_empty() && t >= calls[0].0 && m.cpu.mode() != tg18::cpu::MODE_IRQ && m.cpu.cpsr & tg18::cpu::FLAG_I == 0 {
++                let (_, func, args) = calls.remove(0);
++                m.sys.poke(SPIN, &0xEAFF_FFFEu32.to_le_bytes());
++                injected = Some(m.cpu.clone());
++                m.cpu.r[13] = (m.cpu.r[13].wrapping_sub(0x800)) & !7;
++                m.cpu.r[0] = args[0];
++                m.cpu.r[1] = args[1];
++                m.cpu.r[2] = args[2];
++                m.cpu.r[14] = SPIN;
++                m.cpu.r[15] = func & !1;
++                m.cpu.cpsr |= tg18::cpu::FLAG_T;
++                println!("[lab] t={:.3} call {:08X}({:#x}, {:#x}, {:#x})", t, func, args[0], args[1], args[2]);
++            }
++            if injected.is_some() && (m.cpu.r[15] & !3) == SPIN {
++                let ret = m.cpu.r[0];
++                m.cpu = injected.take().unwrap();
++                println!("[lab] t={:.3} program returned r0={}", t, ret);
++            }
++            if let Some((dt, prefix)) = &every {
++                if t >= next_every {
++                    let f = format!("{}_{:04}.png", prefix, every_n);
++                    tg18::png::write(&f, 128, 128, &m.lcd_rgb(), 2).expect("every");
++                    every_n += 1;
++                    next_every += *dt;
++                }
++            }
++            // idle skipping can jump far ahead; cap the step when something is due
++            let busy = (!forces.is_empty() && forces.iter().any(|f| t <= f.3)) || injected.is_some();
++            let step = if busy { slice } else { (CPU_HZ / 100.0) as u64 };
++            out = m.run_with_sleep((m.executed + step).min(end));
++            if out != Outcome::Limit {
++                break;
++            }
++        }
++        out
++    };
+     let secs = wall.elapsed().as_secs_f64();
+     let emulated = (m.executed as f64 / CPU_HZ) - t0;
+     println!(
+@@ -154,6 +304,16 @@ fn main() {
+     if outcome == Outcome::Crash {
+         println!("fault: {:?}", m.fault());
+     }
++    println!("[lab] LCD DMA source (framebuffer) = {:08X}", m.sys.reg(0xD050_033C));
++    // which 64 KB flash blocks changed during the run
++    let flash_after = &m.sys.ram[..tg18::FLASH_SIZE];
++    let mut changed = Vec::new();
++    for blk in (0..tg18::FLASH_SIZE).step_by(0x1000) {
++        if flash_before[blk..blk + 0x1000] != flash_after[blk..blk + 0x1000] {
++            changed.push(format!("{:06X}", blk));
++        }
++    }
++    println!("[lab] flash 4K blocks changed: {}", if changed.is_empty() { "none".to_string() } else { changed.join(" ") });
+     let tod = m.sys.rtc_irq.tod(m.sys.game_time);
+     println!("game time {:.0} s, time of day {:02}:{:02}", m.sys.game_time, tod / 3600, tod / 60 % 60);
+     for (a, n) in dumps {

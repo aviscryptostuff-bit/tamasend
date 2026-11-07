@@ -540,3 +540,72 @@ Found the live pet struct's absolute base in the magic-green (ON Magic EN) dump:
 **Why this doesn't immediately become new cheats:** the clean numeric stats are already covered (coins/happiness/hunger/growth, in the Cheat Hut). The remaining fields are state flags or records whose meaning can't be pinned down from static code — you have to watch the game react, which needs the emulator running. Setting them blind risks odd behavior.
 
 The pet base is firmware-specific (`0xF800D864` is the ON Magic EN value; other versions differ). Bolter avoids hardcoding it by going through `*(0x200004D4)` + a variable table — the robust way for any custom cheat.
+
+## 16. PC lab session (2026-11-07): emulator running, our own program drawn on the Tama
+
+Everything here was checked in the **nijiiro-egg** emulator running the magic-green dump (= ON Magic EN v058, the owner's version). **Nothing in this section has been tried on a real Tama yet.**
+
+### Setup (on the PC)
+
+- `lab/` (git-ignored, holds Bandai firmware): `nijiiro-egg/` (emulator source, built with Rust), `t-on/` (community dumps), `roms/magic-green.bin`, and the helper scripts.
+- Build: `~/.cargo/bin/cargo.exe build --release --manifest-path lab/nijiiro-egg/Cargo.toml`. Run from `lab/nijiiro-egg`: `./target/release/tg18cli.exe ../roms/magic-green.bin --seconds N ...`
+- Our additions to `tg18cli` are in `tools/nijiiro_lab.patch` (apply with `git apply` inside a nijiiro-egg clone):
+  - `--poke T:ADDR:HEX` and `--force ADDR:HEX:T0:T1`: write memory once, or keep it forced for a time window.
+  - `--shot T:FILE` and `--every DT:PREFIX`: screenshots.
+  - `--run-prog T:FILE`: loads a location/game item at `0x207F0000` and calls its entry from the running game, with interrupts, timers and buttons live. It returns to the game when the program returns. **This is the test bench for our own programs.**
+- `tools/fw.py`: a disassembly helper (needs `pip install capstone`). `tools/sheet.py`: makes contact sheets from screenshots.
+- Python: run scripts with `py -3.15` (bleak, capstone and keystone are installed there). A plain `py` picks 3.14 because of the sender's shebang.
+
+### Corrections to earlier sections
+
+- **Address mapping:** the firmware runs in place with address `0x20XXXXXX` = flash offset `0xXXXXXX`. The "+0x0c" in §12 is wrong.
+- **0xAE is the entry point, not the code size.** The loader calls `0x207F0000 + (BE u32 at 0xAE)` in ARM mode. That address is a normal `main()` that returns r0 (Magic Hut and Moon Terrace both return 0).
+- **0x202** (u16 BE) = file length − 0x204 − 2 in official locations. Bolter leaves it 0.
+- Official locations exist in MyMeets (`assets/items/jp/cherry_blossom_viewing.txt`, `firework_festival.txt`, `tama_slope.txt`), all with entry `0x20A8`, up to ~31 KB. Field `0x48` = full file length.
+
+### Firmware facts found
+
+- **Framebuffer:** `0xF8017B30`, 128×128 RGB565 little-endian. The LCD DMA source register `0xD050033C` holds the same address.
+- **Stable API stubs** (the table official programs call; all 112 are listed in `lab/api_table.txt`):
+  - present frame `0x20000713`
+  - wait ms `0x2000063F`
+  - buttons A/B/C pressed `0x20000425` / `0x20000431` / `0x2000043D`
+  - clear A/B/C `0x20000449` / `0x20000455` / `0x20000461` (r0 = 0)
+  - random `0x20000499`
+- **Firmware debug log:** the developers' printf strings are still in the firmware, and the emulator shows them, with function names such as `ParamLoad`, `SleepControl_*`, `TamaHotel_*`, `main_sub_KekkonUp_And_CharName_Set`, `SpriteDraw` and `_dc3VObjAnl*` (the animation engine).
+- **Hidden factory TestMode:** `0xF800C058` = `gl_Sleep_RIYUU_ID[]` (wake and sleep reason). If the sleep reason (`0xF800C059`) is **5** at boot, `ParamLoad()` runs `TestMode()` (`0x201643D0`).
+  - In the emulator it shows a COUNT screen (A presses), then "VER:058 19-05-13", then an LCD colour test: white, blue, green, red, each waiting for a specific button.
+  - Bolter's "variable 11" writes into this same block. So a downloaded program could set it and send the Tama into TestMode on its next wake. That's untested on a device.
+- Downloaded item storage (flash): food at `0x630000`, items at `0x680000`, wallpapers at `0x6D0000`. Location slots are searched from `0x730000` (16 KB slots). The magic-green dump has no locations installed. The exact format the firmware writes after a download is **not mapped yet**, so `--run-prog` skips it.
+
+### Our first program: `items/tamaos_demo.txt` (built by `tools/make_demo.py`)
+
+- A **location** (`tg18_ode19001`, shown as "tamaos"), 17.8 KB, written from scratch in ARM assembly (keystone).
+- It draws a full-screen animated plasma, a 2-frame walking pixel character bouncing around, and a scrolling banner, straight into the framebuffer. A, B or C exits (it also exits after ~1500 frames).
+- It only writes the framebuffer and calls the API stubs above. It never writes flash or the pet save.
+- It passes the sender's checks: `py -3.15 tamaos_send.py items/tamaos_demo.txt`.
+- **Verified in the emulator** (screens in `lab/sheet_dm.png`). **Not yet on a device.** The real download/loader path (storage slot → copy to `0x207F0000` → checks at `0x2012EFCC`) has not been emulated.
+- Expected risk if it misbehaves on hardware: a freeze, fixed by pulling the battery. The pet save isn't touched.
+- On the real Tama it may run slower than in the emulator, since the code and tables are read from SPI flash.
+
+### Next ideas
+
+1. Send `tamaos_demo.txt` to the real Tama (Connection → APP → back → Download) and find it in the location/Go-out list.
+2. Emulate the download → storage → loader path in nijiiro-egg, so programs are verified exactly as the device will run them.
+3. A full custom **animation player** (frames compressed in the item), **custom minigames**, and **buzzer music** (timer 4 PWM, see the emulator's ARCHITECTURE.md).
+4. A "TamaOS Lab" location with menus: pet-state editor, TestMode switch, resource viewer (load firmware sprites by ID and page through them).
+
+### 16b. Why locations failed on the device, and the install path (2026-11-07, later)
+
+- **The sender wasn't the problem.** The packets match WebMeets' server-built packets byte-for-byte (`/api/webmeets/v1/item-message` for the official cherry_blossom_viewing location and bg50001).
+- **The firmware's install path, mapped and run in the emulator:**
+  - The Download screen (an ARM module around `0x2016D800`) reads the received message from flash at `0x207D0400`. The item sits at message + u32@0xD4 + 12.
+  - It calls `0x2013674D` (accepts only types 0x01/0x81). For anything else it sets `F800BE85`=1 and `F800BE87`=5 and calls the router `0x20172589(5, 0x207B0400, 0x207D0400)` → `0x201592F5` → `0x20158D84`.
+  - Storage table at `0x201CEE28` (16 bytes per category). Locations and games get 2 slots at `0x710000+` (32/64 KB). Launcher: `0x2012EFD3(slot)` copies the item to `0x207F0000` and calls its entry.
+- **New emulator options** (in `tools/nijiiro_lab.patch`): `--load ADDR:FILE`, `--call T:ADDR:R0:R1:R2`, plus a list of the flash blocks written. A full on-device install can be replayed like this:
+  `tg18cli roms/magic-green.bin --load 207D0400:msg.bin --poke 5:F800BE85:01 --poke 5:F800BE87:05 --call 5.01:20172589:5:207B0400:207D0400 --call 14:2012EFD3:0:0:0`
+- **Results:** the official location, Magic Hut, demo C and `tamaos_demo.txt` **all install** (installer returns 1 and writes `0x710000+`). `tamaos_demo.txt` then **launches and runs through the firmware's own launcher**, and A exits.
+- **Device results:** the wallpaper still installs. The 7 KB `tamaos_demo.txt` is **fully received** (ack `f00c461c` = 7,238 bytes) and still fails at about 50% on the bar. So **size is NOT the cause** (an earlier "buffer overflow" theory was wrong). Every location tried so far (18 KB, 27 KB, 7 KB) fails the same way after full receipt.
+- In the emulator, when both location slots are full the installer shows "FULL! CHOOSE ONE TO DELETE" (not a silent fail), so full slots isn't it either.
+- **Still unexplained:** the device rejects locations in a step the `--call` replay skips. That's likely the Download screen's own flow before the router, or the BLE chip side, which isn't emulated. Next: have someone describe the exact fail screen; test an official JP location/game on the EN Tama; or emulate the CC2650 SPI protocol so the real Download screen runs end to end.
+- Sender changes: for locations and games it doesn't send "your turn" and stays connected until `f00c 0002`. `--webmeets` mode exists but drops bytes on Windows (only 27,784 of 27,924 arrived), so don't use it.
