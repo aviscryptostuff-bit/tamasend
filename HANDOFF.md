@@ -508,3 +508,21 @@ The harness **is** enough to run a single item-program routine in isolation and 
 1. Extend `verify_cheat.py` into a general item-program runner (stub the ~10 firmware calls from section 11) so whole custom programs can be dry-run.
 2. Write new cheat routines (set any variable, grow-up, etc.), verify them in the sandbox, then expose them in the site's Cheat Hut.
 3. Only send to the device what the verifier has confirmed.
+
+## 14. Full Magic Hut cheat-field map (verified)
+
+Every variable the Magic Hut writes, recovered by disassembling all its routines and cross-checked against nijiiro-egg's notes and the sandbox verifier (`tools/verify_cheat.py`). The pet struct is at `*(0x200004D4)`; offsets are into it.
+
+| Magic Hut var | pet offset | size | meaning | confidence |
+|---|---|---|---|---|
+| var3 | +0x20 | u32 | **Gotchi Points** | high (matches emulator `0xF800D884`) |
+| var0 | +0x05 | u8 | **hunger / fullness** | high (matches emulator `0xF800D869`) |
+| var2 | +0x11 | u8 | **happiness** | high |
+| var4 | +0x36 | u16 | **growth stage** (time potion does +1, cap ~4) | high |
+| var1 | +0x0c | u8 | **evolve trigger** (set, then cleared) | med |
+| var10 | +0x372 | u8 | toggle (bit 0) — unknown effect | low |
+| var11 | +0x404 | u8 | written + mirrored to `0xF800C058/60` — unknown | low |
+
+The site's **Cheat Hut** (Custom tab) now patches the high-confidence ones to any value — **coins, happiness, hunger** — reusing Bolter's proven code (only the value immediates change: coins `0x7a0`, happiness `0x600`, hunger `0x60c`), with the checksum fixed. Each build is checked in the sandbox before it's considered good.
+
+The time/growth potion (var4 +1) and the two unknown toggles ride along in the same file (they're Bolter's untouched routines). Setting growth to an exact stage, or decoding the unknowns/age/weight/character, needs either custom code injected into a routine (doable with the verifier, not yet done) or the full emulator to watch the effect.
