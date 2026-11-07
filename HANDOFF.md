@@ -481,3 +481,30 @@ To build custom programs we can *verify* before sending (instead of guessing and
 - `0x2012f68c` is a **call veneer** (`bx r3; bx r4; ...`), so the loader's "constants" (`0x2013fa15`, `0x201583fb`, `0x2001448c`, ...) are firmware functions called indirectly. Finding the final "enter the program" jump means following that indirect-call chain — better done in an emulator than by hand.
 - **Practical takeaway:** reading firmware instructions by hand has hit diminishing returns. The next leap (entry convention, the `0x20000f47` service table, and writing a program we can verify) wants a **running emulator** (Paramix T18Emu) as the platform. That's a separate, larger setup task.
 
+
+## 13. Emulator and a working cheat verifier (no device)
+
+Found a finished emulator and built a verifier, both with no hardware.
+
+### The emulator exists: nijiiro-egg
+
+`github.com/oreo-fox/nijiiro-egg` is an open-source (MIT) Tamagotchi On/Meets emulator in Rust, with a Python/Unicorn prototype. It runs the real firmware from an 8 MB dump. Reading its code **independently confirmed all of section 11–12**: executes at `0x20000000`, reset PC `0x20000048`, SRAM at `0xF8000000`. It supports "ON Magic (EN)" (the owner's version). Setup guide: `docs/EMULATOR_SETUP.md`. It needs a PC (Windows now, Android planned).
+
+### Firmware boots in a sandbox here
+
+A minimal Unicorn harness (my own code) boots the magic-green dump: it runs from `0x20000048` into the `0x20013xxx` range and reaches the `0xF800xxxx` SRAM init. It then **stalls in a clock/PLL wait** on MMIO `0xD0000000` — expected, because a minimal harness doesn't emulate the chip peripherals. A *full* playable boot is what nijiiro-egg already does; reproducing it is not worth it.
+
+### `tools/verify_cheat.py` — proving a cheat before sending it
+
+The harness **is** enough to run a single item-program routine in isolation and check what it writes. `verify_cheat.py` loads a Magic-Hut-style file at `0x207F0000`, sets up a fake pet and the pet pointer at `0x200004D4`, stubs the item's region-detection, and runs the actual ARM cheat routines. Results (confirmed):
+
+- Original Magic Hut: coins routine writes **99999** to pet `+0x20` (Gotchi Points); stats routine writes happiness **100** to `+0x11` and **6** to `+0x05`.
+- Our Cheat Hut (site) patched to coins 12345 / happiness 77: writes **12345** and **77**. End-to-end match.
+
+**This is the key safety tool:** any custom cheat we build can be run in the sandbox and checked against the intended writes *before* it goes to a real Tama. Needs `pip install unicorn capstone`.
+
+### What this unlocks next (safe, doable here)
+
+1. Extend `verify_cheat.py` into a general item-program runner (stub the ~10 firmware calls from section 11) so whole custom programs can be dry-run.
+2. Write new cheat routines (set any variable, grow-up, etc.), verify them in the sandbox, then expose them in the site's Cheat Hut.
+3. Only send to the device what the verifier has confirmed.
