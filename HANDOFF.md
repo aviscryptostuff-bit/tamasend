@@ -234,6 +234,11 @@ Images start at 0x200, except for accessories, where they start at 0x5c2. Games 
     - Boy, girl or random sex, and English or Japanese speech;
     - then Visit → Marry, or Back.
 - The visit state is kept in localStorage, so reloading between step 1 and step 2 is safe.
+- After a visit, the Marry tab shows **Your Tama**:
+  - from the reply: character ID and picture, growth stage, and probable sex, name, generation and birthday;
+  - **Save** and **Copy** buttons for the raw reply. These dumps are the starting point for real mods (for example, finding where age is stored).
+- **Experimental switch:** allows marrying a Tama that isn't an adult. MyMeets blocks this in the app, not on the Tama. Nobody knows what the Tama does with it, and the page warns about that.
+- The owner asked about a "Magic Hut" age-up cheat. Nothing documented was found; it's a location in the Magic version.
 - **iPhone:** Safari has no Web Bluetooth, so use the **Bluefy** browser. Bluefy only allows Bluetooth on a top-level https page. The Claude artifact frame blocks it, so the page has to be self-hosted.
   - It was on tiiny.host, but that account is out of uploads.
   - Now: **GitHub Pages** from this repo (Settings → Pages → deploy from `main`). The URL is `https://aviscryptostuff-bit.github.io/tamasend/`.

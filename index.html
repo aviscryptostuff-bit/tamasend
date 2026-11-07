@@ -324,8 +324,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
         <button class="go" id="mMarryBtn" disabled>Connect &amp; marry</button>
         <button class="alt" id="mBackBtn" disabled>Just bring my Tama back</button>
         <small class="hint">Use "bring back" if your Tama isn't an adult yet, or if you change your mind. It follows the same steps as Marry.</small>
+        <label class="toggle" for="mForce"><input type="checkbox" id="mForce">
+          <small><b>Experimental:</b> let me try to marry even if it isn't an adult.</small></label>
+        <div id="mForceWarn" class="msg warn" hidden>MyMeets refuses this, and nobody knows what the Tama does with it. It might ignore it, or it might mess up your Tama's save. Only try it if you're OK with that.</div>
       </div>
       <div id="mResult" class="msg" hidden></div>
+    </section>
+
+    <section id="mTama" hidden>
+      <h2>Your Tama (read during the visit)</h2>
+      <div class="preview">
+        <canvas id="mTamaCanvas" width="64" height="64" aria-label="Your Tama's character"></canvas>
+        <div class="pv-side">
+          <div id="mTamaInfo" class="hint"></div>
+          <button class="alt" id="mTamaSave">Save my Tama's data</button>
+          <button class="alt" id="mTamaCopy">Copy it as text</button>
+          <small>This is the raw data your Tama sent. Saving it helps us work out more mods. The picture uses the original grey colors.</small>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -1093,12 +1109,52 @@ $("mModeHint").textContent = MODE_HINTS[0];
 let visit = null;
 function restoreVisit() {
   try { const s = JSON.parse(store.get("tamaos_visit") || "null"); if (s) visit = { data: b64(s.data), id: s.id, adult: s.adult }; } catch {}
+  try { const t = store.get("tamaos_last_tama"); if (t) showTama(b64(t)); } catch {}
   updateSteps();
 }
+// What we can read from the visit reply. The section values are what MyMeets uses; the header fields
+// mirror the partner record MyMeets sends in a marriage, so they are probably the same on the way in.
+function readTama(d) {
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength), u16 = o => o + 2 <= d.length ? dv.getUint16(o, true) : null;
+  const sec = o => o + 4 <= d.length ? dv.getUint32(o, true) : null;
+  const a = sec(0xcc), b = sec(0xd0);
+  let name = ""; for (let i = 0x60; i + 1 < 0x70 && i + 1 < d.length; i += 2) { if (d[i] !== 4 && d[i] !== 8) break; name += MOJIS[d[i+1] >> 4][d[i+1] & 15]; }
+  return {
+    character: a !== null && a + 16 <= d.length ? u16(a + 14) : null, growth: b !== null && b + 16 <= d.length ? u16(b + 14) : null,
+    sex: d[0x5f], name: name.trim(), generation: u16(0x7a), growthByte: d[0x7c], birthday: u16(0x8a), bytes: d.length,
+  };
+}
+function showTama(d) {
+  const t = readTama(d);
+  $("mTama").hidden = false;
+  const rows = [
+    ["Character", t.character], ["Growth stage", t.growth === null ? "?" : `${t.growth}${t.growth >= 2 ? " (adult)" : " (not adult yet; 2 or more is adult)"}`],
+    ["Sex (probably)", t.sex === 0 ? "0 (boy?)" : t.sex === 1 ? "1 (girl?)" : t.sex], ["Name (probably)", t.name || "-"],
+    ["Generation (probably)", t.generation], ["Birthday field (probably)", t.birthday === null ? "-" : "0x" + t.birthday.toString(16)],
+    ["Data size", `${t.bytes.toLocaleString()} bytes`],
+  ];
+  $("mTamaInfo").replaceChildren(...rows.map(([k, v]) => { const r = document.createElement("div"); const b = document.createElement("b"); b.textContent = k + ": "; r.append(b, String(v)); return r; }));
+  const ctx = $("mTamaCanvas").getContext("2d"); ctx.clearRect(0, 0, 64, 64);
+  const grey = PALETTES.length - 1, im = t.character !== null && ch.meta ? composeImage({ B: [t.character, grey], A: [t.character, grey], M: [t.character, 0], K: [t.character, grey] }, false) : null;
+  if (im) { const k = keyOut({ w: im.w, h: im.h, px: im.px.slice() }); ctx.putImageData(new ImageData(k.px, 64, 64), 0, 0); }
+  $("mTama").dataset.raw = toB64(d);
+  store.set("tamaos_last_tama", toB64(d));
+}
+$("mTamaSave").addEventListener("click", () => {
+  const d = b64($("mTama").dataset.raw || ""), a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([d], { type: "application/octet-stream" }));
+  a.download = `my_tama_${new Date().toISOString().slice(0, 10)}.bin`; document.body.append(a); a.click(); a.remove();
+});
+$("mTamaCopy").addEventListener("click", async () => {
+  const text = "TAMA DATA (base64)\n" + ($("mTama").dataset.raw || "");
+  try { await navigator.clipboard.writeText(text); $("mTamaCopy").textContent = "Copied"; setTimeout(() => $("mTamaCopy").textContent = "Copy it as text", 1500); }
+  catch { log(text); show($("mResult"), "Couldn't copy here, so the data was put in the log instead. Use Copy log.", "warn"); }
+});
+$("mForce").addEventListener("change", () => { $("mForceWarn").hidden = !$("mForce").checked; updateSteps(); });
 function updateSteps() {
   $("mStep1").classList.toggle("done", !!visit);
   $("mBadge1").textContent = visit ? `STEP 1 · VISIT · DONE${visit.adult ? "" : " (NOT AN ADULT)"}` : "STEP 1 · VISIT";
-  $("mMarryBtn").disabled = !visit || !visit.adult; $("mBackBtn").disabled = !visit;
+  $("mMarryBtn").disabled = !visit || !(visit.adult || $("mForce").checked); $("mBackBtn").disabled = !visit;
 }
 const pace = () => Math.max(10, Math.min(200, parseInt($("mDelay").value, 10) || 40));
 async function marryAction(btn, fn) {
@@ -1113,7 +1169,7 @@ $("mVisitBtn").addEventListener("click", () => marryAction($("mVisitBtn"), async
   await loadCharacters(); if (!ch.meta) throw Object.assign(new Error("The characters haven't loaded yet."), { friendly: true });
   const { first, second } = await withTama(link => exchange(link, OP.visit, compilePacket(OP.visit, CMD.visit, 0x102), "visit", pace(), progress));
   const adult = isAdult(second);
-  visit = { data: second, id: visitorId(first), adult };
+  visit = { data: second, id: visitorId(first), adult }; showTama(second);
   store.set("tamaos_visit", JSON.stringify({ data: toB64(second), id: visit.id, adult }));
   progress(100); lcd("VISIT", adult ? "Your Tama is visiting!" : "Not an adult yet");
   show(res, adult ? "Your Tama is visiting. Press any button on it, then follow step 2."
@@ -1130,6 +1186,7 @@ $("mMarryBtn").addEventListener("click", () => marryAction($("mMarryBtn"), async
     mode: parseInt($("mMode").value, 10), sex: s === "r" ? rnd(0, 2) : parseInt(s, 10), lang: parseInt($("mLang").value, 10),
     ids: { B: ch.sel.B[0], M: ch.sel.M[0], A: ch.sel.A[0], K: ch.sel.K[0] }, colors: [ch.sel.B[1], ch.sel.A[1], ch.sel.K[1]],
   };
+  if (!visit.adult) log("experimental: marrying a Tama that MyMeets says isn't an adult");
   const msg = buildMarriage(visit.data, opts);
   log(`marriage file built: ${msg.length} bytes, mode ${opts.mode}, sex ${opts.sex}, parts ${JSON.stringify(opts.ids)}, colors ${opts.colors}`);
   await withTama(async link => {
