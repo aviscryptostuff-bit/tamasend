@@ -528,3 +528,15 @@ The site's **Cheat Hut** (Custom tab) now patches the high-confidence ones to an
 The **Cheat Hut** now also sets the **time potion** to an exact growth stage: it patches one instruction at `0x5cc` (`add r1,r5,#1` -> `mov r1,#N`) so the potion sets growth to N instead of +1. This can take a baby straight to adult (2+ is usually marriageable). Verified in the sandbox: baby(0) -> stage 2 and stage 4, and the untouched "+1" path still steps 0->1->2->3. This is the first *logic* change (not just a value), still done by swapping one proven instruction, so risk stays low.
 
 Decoding the unknown toggles, age, weight or character still needs the full emulator to watch the effect.
+
+## 15. Full pet-struct map (from the firmware)
+
+Found the live pet struct's absolute base in the magic-green (ON Magic EN) dump: **`0xF800D864`** (the literal loaded before `ldrb [r3,#0x52]`, which is Bolter's var6). It's referenced from ~249 places. Scanning the firmware for `ldr rX,=0xF800D864` and the field accesses right after gives a partial but real field map (offsets into the struct):
+
+- Confirmed (match Bolter + emulator): `+0x05` hunger, `+0x0c` evolve flag, `+0x11` happiness, `+0x20` Gotchi Points, `+0x36` growth.
+- Heavily used **state flags** (compared to small constants, so modes/levels, not stats): `+0x3a` (u16, `==1`), `+0x52` (u8, `<=3`), `+0x384` (u8, `==1`). Meanings unknown; unsafe to set blind.
+- Clusters of byte writes (`+0x226..0x230`, `+0x241..0x261`, `+0x6c..0x76`) look like small arrays/records (possibly the name near `+0x6c`, care/inventory records elsewhere). Not decoded.
+
+**Why this doesn't immediately become new cheats:** the clean numeric stats are already covered (coins/happiness/hunger/growth, in the Cheat Hut). The remaining fields are state flags or records whose meaning can't be pinned down from static code — you have to watch the game react, which needs the emulator running. Setting them blind risks odd behavior.
+
+The pet base is firmware-specific (`0xF800D864` is the ON Magic EN value; other versions differ). Bolter avoids hardcoding it by going through `*(0x200004D4)` + a variable table — the robust way for any custom cheat.
