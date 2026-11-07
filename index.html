@@ -3,25 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TamaOS Sender</title>
+<title>TamaOS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one narrow column like a handheld; an LCD-style status window up top, controls below. */
+/* One narrow column like a handheld: LCD status window up top, tabs below, one send button per tab. */
 :root {
-  --bg: #f3f1f7;
-  --surface: #ffffff;
-  --ink: #221d2e;
-  --muted: #6c6580;
-  --line: #ddd8e8;
-  --accent: #e2457a;
-  --accent-ink: #ffffff;
-  --lcd: #c9d8b6;
-  --lcd-ink: #2e3a22;
-  --ok: #1f8a5b;
-  --warn: #b7791f;
-  --bad: #c53030;
+  --bg: #f3f1f7; --surface: #ffffff; --ink: #221d2e; --muted: #6c6580; --line: #ddd8e8;
+  --accent: #e2457a; --accent-ink: #ffffff; --lcd: #c9d8b6; --lcd-ink: #2e3a22;
+  --ok: #1f8a5b; --warn: #b7791f; --bad: #c53030;
   --font-display: "DotGothic16", "Courier New", monospace;
   --font-body: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -39,31 +30,38 @@
   --ok: #4fd1a0; --warn: #f2b84b; --bad: #ff7b7b; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
-  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 20px 40px;
 }
-.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 18px; }
+.wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
 header { display: grid; gap: 4px; }
 h1 { font-family: var(--font-display); font-weight: 400; font-size: 30px; line-height: 1.1; margin: 0; letter-spacing: 0.02em; }
 .sub { color: var(--muted); margin: 0; text-wrap: balance; }
 
-.lcd {
-  background: var(--lcd); color: var(--lcd-ink); border-radius: 14px; padding: 16px;
-  font-family: var(--font-display); display: grid; gap: 10px;
-  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--lcd-ink) 18%, transparent);
-}
+.lcd { background: var(--lcd); color: var(--lcd-ink); border-radius: 14px; padding: 16px; font-family: var(--font-display); display: grid; gap: 10px;
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--lcd-ink) 18%, transparent); }
 .lcd-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 15px; }
-.lcd-big { font-size: 22px; min-height: 1.3em; }
+.lcd-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lcd-big { font-size: 20px; min-height: 1.3em; }
 .bar { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--lcd-ink) 15%, transparent); overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0%; background: var(--lcd-ink); transition: width .2s linear; }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.tabs button { background: transparent; color: var(--muted); padding: 10px 6px; font-size: 15px; border-radius: 9px; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+[role=tabpanel] { display: grid; gap: 16px; min-width: 0; }
+[role=tabpanel][hidden] { display: none; }
+
 section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; font-weight: 800; }
+h3 { font-size: 15px; margin: 0; }
 ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.jp { font-family: var(--font-display); }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
 
 .choices { display: grid; gap: 8px; }
 .choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
@@ -74,129 +72,263 @@ ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 input[type=file] { max-width: 100%; font: inherit; color: var(--muted); }
 
 .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-label.f { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+label.f { display: grid; gap: 4px; font-weight: 600; font-size: 14px; align-content: start; }
 label.f small { font-weight: 400; color: var(--muted); }
+input[type=text], input[type=number], input[type=search], select { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; min-width: 0; }
+input[type=number] { font-variant-numeric: tabular-nums; }
+.toggle { display: flex; gap: 8px; align-items: center; min-height: 40px; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
 .shop { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.card { display: grid; gap: 2px; justify-items: center; text-align: center; padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; position: relative; }
+.card { display: grid; gap: 2px; justify-items: center; align-content: start; text-align: center; padding: 10px 6px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; position: relative; min-width: 0; }
 .card input { position: absolute; opacity: 0; pointer-events: none; }
 .card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .card:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
 .card canvas { width: 96px; height: 64px; image-rendering: pixelated; background: var(--lcd); border-radius: 6px; margin-bottom: 4px; }
 .card small { color: var(--muted); font-size: 12px; }
+.card b { font-size: 13px; overflow-wrap: anywhere; }
+.catalog { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 60vh; overflow: auto; padding: 2px; }
+.catalog .card canvas { width: 72px; height: 72px; }
+.catalog .card b { font-family: var(--font-display); font-weight: 400; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 6px 10px; font-size: 13px; border-radius: 999px; font-weight: 600; }
+.chips button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { flex: 1 1 140px; }
+
 .preview { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
-.preview canvas { width: 192px; height: 192px; image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); max-width: 100%; }
-.pv-side { display: grid; gap: 10px; flex: 1 1 160px; min-width: 0; }
+.preview canvas { width: 192px; height: 192px; image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); background: var(--lcd); max-width: 100%; }
+.pv-side { display: grid; gap: 8px; flex: 1 1 160px; min-width: 0; }
 .pv-side small { color: var(--muted); }
 .photo-opts { display: grid; gap: 10px; }
-input[type=text] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
-.toggle { display: flex; gap: 8px; align-items: center; min-height: 40px; }
-.toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-input[type=number] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; font-variant-numeric: tabular-nums; }
+
+.parts { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 46vh; overflow: auto; padding: 2px; }
+.parts .card { padding: 4px; }
+.parts .card canvas { width: 64px; height: 64px; margin: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.swatch { height: 36px; border-radius: 8px; border: 2px solid var(--line); padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; }
+.swatch i { display: block; }
+.swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.seg button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 8px 4px; font-size: 13px; border-radius: 8px; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.stepbox { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
+.stepbox.done { border-color: var(--ok); }
+.badge { font-size: 12px; font-weight: 800; color: var(--muted); }
+.stepbox.done .badge { color: var(--ok); }
 
 button { font: inherit; font-weight: 800; border: 0; border-radius: 12px; padding: 14px 16px; cursor: pointer; }
 .go { background: var(--accent); color: var(--accent-ink); font-size: 17px; width: 100%; }
-.go:disabled { opacity: .5; cursor: not-allowed; }
+.go:disabled, .alt:disabled { opacity: .5; cursor: not-allowed; }
+.alt { background: var(--bg); color: var(--ink); border: 1px solid var(--line); width: 100%; }
 .ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 8px 12px; font-size: 13px; }
-button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
 
 .msg { border-radius: 10px; padding: 10px 12px; font-size: 14px; border: 1px solid var(--line); }
 .msg.bad { border-color: var(--bad); color: var(--bad); }
 .msg.ok { border-color: var(--ok); color: var(--ok); }
 .msg.warn { border-color: var(--warn); color: var(--warn); }
-
 .logbox { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.45; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; height: 180px; overflow: auto; white-space: pre; color: var(--muted); }
 .logrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+@media (max-width: 380px) { .catalog { grid-template-columns: repeat(2, minmax(0, 1fr)); } .parts { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fields { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-
-
 <div class="wrap">
   <header>
-    <h1>TamaOS Sender</h1>
-    <p class="sub">Sends wallpapers and items to your Tamagotchi On over Bluetooth, straight from your phone.</p>
+    <h1>TamaOS</h1>
+    <p class="sub">Items, coins and marriage for your Tamagotchi On over Bluetooth, straight from your phone.</p>
   </header>
 
   <div class="lcd" aria-live="polite">
     <div class="lcd-row"><span id="lcdState">READY</span><span id="lcdPts">+0 PTS</span></div>
-    <div class="lcd-big" id="lcdMain">Pick an item below</div>
+    <div class="lcd-big" id="lcdMain">Pick something below</div>
     <div class="bar"><i id="barFill"></i></div>
-    <div class="lcd-row"><span id="lcdItem">bg50001</span><span id="lcdPct">0%</span></div>
+    <div class="lcd-row"><span id="lcdItem">-</span><span id="lcdPct">0%</span></div>
   </div>
 
   <div id="support" class="msg warn" hidden></div>
 
-  <section>
-    <h2>On the Tamagotchi</h2>
-    <ol class="steps">
-      <li>Make sure it's awake. It refuses connections while sleeping; setting its clock to daytime wakes it.</li>
-      <li>Go to <b>Connection → APP</b>, back out, then <b>Connection → Download</b>.</li>
-      <li>While it's on the waiting screen, tap <b>Connect &amp; send</b> and pick <b>TMGC_meets</b>.</li>
-    </ol>
-  </section>
+  <div class="tabs" role="tablist" aria-label="TamaOS sections">
+    <button role="tab" id="tab-shop" aria-controls="panel-shop" aria-selected="true">Shop</button>
+    <button role="tab" id="tab-custom" aria-controls="panel-custom" aria-selected="false" tabindex="-1">Custom</button>
+    <button role="tab" id="tab-marry" aria-controls="panel-marry" aria-selected="false" tabindex="-1">Marry</button>
+  </div>
 
-  <section>
-    <h2>Item</h2>
-    <div class="choices">
-      <div class="shop" role="group" aria-label="TamaOS custom items">
-        <label class="card"><input type="radio" name="src" value="preset:pistol" checked>
-          <canvas data-anim="pistol" width="96" height="64"></canvas>
-          <b>Pistol</b><small>Toy · fires a bullet at a target</small></label>
-        <label class="card"><input type="radio" name="src" value="preset:skateboard">
-          <canvas data-anim="skateboard" width="96" height="64"></canvas>
-          <b>Skateboard</b><small>Toy · your Tama rides it</small></label>
-        <label class="card"><input type="radio" name="src" value="preset:pizza">
-          <canvas data-anim="pizza" width="96" height="64"></canvas>
-          <b>Pizza</b><small>Snack · makes your Tama happy</small></label>
-        <label class="card"><input type="radio" name="src" value="preset:burger">
-          <canvas data-anim="burger" width="96" height="64"></canvas>
-          <b>Burger</b><small>Meal · fills hunger</small></label>
+  <!-- ===================== SHOP (MyMeets catalogue) ===================== -->
+  <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop">
+    <section>
+      <h2>Catalogue</h2>
+      <div class="row">
+        <label class="f" for="catLang">Language
+          <select id="catLang"><option value="en">English items</option><option value="jp">Japanese items</option></select></label>
+        <label class="f" for="catSearch">Search
+          <input type="search" id="catSearch" placeholder="Name or number"></label>
       </div>
-      <label class="choice"><input type="radio" name="src" id="srcPhoto" value="photo">
-        <span><b>Your photo</b><small>Cropped to 128 × 128 and reduced to 15 colors</small>
-        <input type="file" id="photoIn" accept="image/*"></span></label>
-      <label class="choice"><input type="radio" name="src" id="srcBuiltin" value="builtin">
-        <span><b>Starter wallpaper</b><small>tg19_bg50001 · the one we captured from MyMeets · 8,746 bytes</small></span></label>
-      <label class="choice"><input type="radio" name="src" id="srcFile" value="file">
-        <span><b>Item file from your phone</b><small>Any MyMeets item <code>.txt</code> (wallpapers, food, toys)</small>
-        <input type="file" id="fileIn" accept=".txt,application/octet-stream,text/plain"></span></label>
-    </div>
-    <div id="itemInfo" class="msg" hidden></div>
-    <div class="preview" id="previewBox" hidden>
-      <canvas id="preview" width="128" height="128" aria-label="Wallpaper preview"></canvas>
-      <div class="pv-side">
-        <small id="previewLabel">Preview of what the Tama will show</small>
-        <div class="photo-opts" id="photoOpts" hidden>
-          <label class="f" for="wpName">Wallpaper name
-            <input type="text" id="wpName" maxlength="21" value="TamaOS photo"></label>
-          <label class="f" for="wpId">Wallpaper number
-            <input type="number" id="wpId" min="50012" max="65535" value="51001">
-            <small>Use a new number for every photo. The starter is 50001.</small></label>
-          <small>The Tama shows the name in lowercase letters only, up to 11.</small>
-          <span class="toggle"><input type="checkbox" id="dither" checked> <small>Dithering (smoother photos)</small></span>
+      <div class="chips" id="catTypes" role="group" aria-label="Item type"></div>
+      <div id="catStatus" class="hint">Loading the catalogue…</div>
+      <div class="shop catalog" id="catGrid" role="radiogroup" aria-label="Catalogue items"></div>
+      <div class="preview" id="catPick" hidden>
+        <canvas id="catCanvas" width="128" height="128" aria-label="Selected item"></canvas>
+        <div class="pv-side">
+          <h3 id="catName" class="jp"></h3>
+          <small id="catMeta"></small>
+          <small>Every frame of the item is shown in turn.</small>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 
-  <section>
-    <h2>Settings</h2>
-    <div class="fields">
-      <label class="f" for="pts">Gotchi Points
-        <input type="number" id="pts" min="0" max="99999" value="0">
-        <small>Sent along with the item. 0 to 99,999.</small></label>
-      <label class="f" for="delay">Pace (ms per chunk)
-        <input type="number" id="delay" min="10" max="200" value="40">
-        <small>Raise it if transfers fail near the end.</small></label>
-      <label class="f" for="price">Shop price (wallpapers)
-        <input type="number" id="price" min="0" max="65535" value="1">
-        <small>The starter wallpaper costs 1,500 in the Tama's shop. This sets your own price.</small></label>
-      <label class="f" for="setPrice">Change the price
-        <span class="toggle"><input type="checkbox" id="setPrice" checked> <small>Only for wallpapers</small></span></label>
-    </div>
-  </section>
+  <!-- ===================== CUSTOM (our own items) ===================== -->
+  <div role="tabpanel" id="panel-custom" aria-labelledby="tab-custom" hidden>
+    <section>
+      <h2>Item</h2>
+      <div class="choices">
+        <div class="shop" role="radiogroup" aria-label="TamaOS custom items">
+          <label class="card"><input type="radio" name="src" value="preset:pistol" checked>
+            <canvas data-anim="pistol" width="96" height="64"></canvas>
+            <b>Pistol</b><small>Toy · fires a bullet at a target</small></label>
+          <label class="card"><input type="radio" name="src" value="preset:skateboard">
+            <canvas data-anim="skateboard" width="96" height="64"></canvas>
+            <b>Skateboard</b><small>Toy · your Tama rides it</small></label>
+          <label class="card"><input type="radio" name="src" value="preset:pizza">
+            <canvas data-anim="pizza" width="96" height="64"></canvas>
+            <b>Pizza</b><small>Snack · makes your Tama happy</small></label>
+          <label class="card"><input type="radio" name="src" value="preset:burger">
+            <canvas data-anim="burger" width="96" height="64"></canvas>
+            <b>Burger</b><small>Meal · fills hunger</small></label>
+        </div>
+        <label class="choice"><input type="radio" name="src" id="srcPhoto" value="photo">
+          <span><b>Your photo</b><small>Cropped to 128 × 128 and reduced to 15 colors</small>
+          <input type="file" id="photoIn" accept="image/*"></span></label>
+        <label class="choice"><input type="radio" name="src" id="srcBuiltin" value="builtin">
+          <span><b>Starter wallpaper</b><small>tg19_bg50001 · the one we captured from MyMeets</small></span></label>
+        <label class="choice"><input type="radio" name="src" id="srcFile" value="file">
+          <span><b>Item file from your phone</b><small>Any MyMeets item <code>.txt</code> (wallpapers, food, toys)</small>
+          <input type="file" id="fileIn" accept=".txt,application/octet-stream,text/plain"></span></label>
+      </div>
+      <div id="itemInfo" class="msg" hidden></div>
+      <div class="preview" id="previewBox" hidden>
+        <canvas id="preview" width="128" height="128" aria-label="Wallpaper preview"></canvas>
+        <div class="pv-side">
+          <small id="previewLabel">Preview of what the Tama will show</small>
+          <div class="photo-opts" id="photoOpts" hidden>
+            <label class="f" for="wpName">Wallpaper name
+              <input type="text" id="wpName" maxlength="21" value="TamaOS photo"></label>
+            <label class="f" for="wpId">Wallpaper number
+              <input type="number" id="wpId" min="50012" max="65535" value="51001">
+              <small>Use a new number for every photo. The starter is 50001.</small></label>
+            <small>The Tama shows the name in letters only, up to 11.</small>
+            <span class="toggle"><input type="checkbox" id="dither" checked> <small>Dithering (smoother photos)</small></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 
-  <button class="go" id="goBtn">Connect &amp; send</button>
+  <!-- ===================== SEND (shared by Shop and Custom) ===================== -->
+  <div id="sendArea" class="wrap" style="max-width:none;gap:16px">
+    <section>
+      <h2>On the Tamagotchi</h2>
+      <ol class="steps">
+        <li>Make sure it's awake. It refuses connections while sleeping; setting its clock to daytime wakes it.</li>
+        <li>Go to <b>Connection → APP</b>, back out, then <b>Connection → Download</b>.
+          <span class="hint">(MyMeets uses <b>Connection → APP → Present</b> <span class="jp">(プレゼント)</span> instead; either should work.)</span></li>
+        <li>While it's on the waiting screen, tap <b>Connect &amp; send</b> and pick <b>TMGC_meets</b>.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>Settings</h2>
+      <div class="fields">
+        <label class="f" for="pts">Gotchi Points
+          <input type="number" id="pts" min="0" max="99999" value="0">
+          <small>Sent along with the item. 0 to 99,999.</small></label>
+        <label class="f" for="delay">Pace (ms per chunk)
+          <input type="number" id="delay" min="10" max="200" value="40">
+          <small>Raise it if transfers fail near the end.</small></label>
+        <label class="f" for="price">Shop price
+          <input type="number" id="price" min="0" max="65535" value="1">
+          <small>What the item costs in the Tama's shop.</small></label>
+        <label class="f" for="setPrice">Change the price
+          <span class="toggle"><input type="checkbox" id="setPrice"> <small>Off sends the item exactly as it is</small></span></label>
+      </div>
+    </section>
+    <button class="go" id="goBtn">Connect &amp; send</button>
+  </div>
+
+  <!-- ===================== MARRY (MyMeets marriage) ===================== -->
+  <div role="tabpanel" id="panel-marry" aria-labelledby="tab-marry" hidden>
+    <section>
+      <h2>Partner</h2>
+      <div id="mStatus" class="hint">Loading characters…</div>
+      <div class="preview">
+        <canvas id="mCanvas" width="64" height="64" aria-label="Your partner"></canvas>
+        <div class="pv-side">
+          <button class="alt" id="mRandom">Random character</button>
+          <button class="alt" id="mRandomColors">Random colors</button>
+          <label class="f" for="mWhole">Whole character
+            <select id="mWhole"><option value="">Pick one…</option></select></label>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="Part to change" id="mPartTabs">
+        <button data-part="B" aria-pressed="true">Body</button>
+        <button data-part="M" aria-pressed="false">Face</button>
+        <button data-part="A" aria-pressed="false">Head</button>
+        <button data-part="K" aria-pressed="false">Back</button>
+      </div>
+      <div id="mColorsBox" class="pv-side">
+        <small id="mColorsLabel">Color for the body</small>
+        <div class="swatches" id="mSwatches" role="group" aria-label="Part color"></div>
+      </div>
+      <div class="shop parts" id="mGrid" role="radiogroup" aria-label="Parts"></div>
+    </section>
+
+    <section>
+      <h2>Options</h2>
+      <div class="fields">
+        <label class="f" for="mMode">Marriage
+          <select id="mMode">
+            <option value="0">Marry character</option>
+            <option value="1">Get character</option>
+            <option value="2">Random genes</option>
+          </select>
+          <small id="mModeHint"></small></label>
+        <label class="f" for="mSex">Your partner is a
+          <select id="mSex"><option value="0">Boy</option><option value="1">Girl</option><option value="r">Random</option></select></label>
+        <label class="f" for="mLang">Character speaks
+          <select id="mLang"><option value="8">English</option><option value="4">Japanese</option></select></label>
+        <label class="f" for="mDelay">Pace (ms per chunk)
+          <input type="number" id="mDelay" min="10" max="200" value="40">
+          <small>The marriage file is 39 KB, about 80 seconds.</small></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Marry your Tama</h2>
+      <p class="hint">Your Tama has to be an adult. MyMeets' marriage works in two connections: first your Tama visits, then it comes back married.</p>
+      <div class="stepbox" id="mStep1">
+        <span class="badge" id="mBadge1">STEP 1 · VISIT</span>
+        <ol class="steps">
+          <li>On the Tama: <b>Connection</b> <span class="jp">(ツーしん)</span> → <b>App</b> <span class="jp">(アプリ)</span> → <b>Visit</b> <span class="jp">(あそびにいく)</span>, the top option.</li>
+          <li>While it waits, tap the button and pick <b>TMGC_meets</b>.</li>
+        </ol>
+        <button class="go" id="mVisitBtn">Connect &amp; let my Tama visit</button>
+      </div>
+      <div class="stepbox" id="mStep2">
+        <span class="badge" id="mBadge2">STEP 2 · MARRY</span>
+        <ol class="steps">
+          <li>Press any button on the Tama.</li>
+          <li>Go to <b>Connection → App</b> again. When it asks <b>Return?</b> <span class="jp">(かえる？)</span>, pick <b>Yes</b> <span class="jp">(はい)</span>.</li>
+          <li>While it waits, tap <b>Marry</b> and pick <b>TMGC_meets</b>.</li>
+        </ol>
+        <button class="go" id="mMarryBtn" disabled>Connect &amp; marry</button>
+        <button class="alt" id="mBackBtn" disabled>Just bring my Tama back</button>
+        <small class="hint">Use "bring back" if your Tama isn't an adult yet, or if you change your mind. It follows the same steps as Marry.</small>
+      </div>
+      <div id="mResult" class="msg" hidden></div>
+    </section>
+  </div>
+
   <div id="result" class="msg" hidden></div>
 
   <section>
@@ -207,114 +339,212 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb
 
 <script>
 const BG50001_B64 = "VEFNQUdPAHcAYQBsAGwAcABhAHAAZQByAC4AagBwAGcAAAAAAAAAAAAAAAAAAAAAAAAiKnRnMTlfYmc1MDAwMQAAAAAAAAAAAAAiKgMBgQcfAAAAAAAAAAAAw1EAAATnBOAE6wTrBO4E9gTkBOQE7QAAAAAAAAXcAAADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAASAkgIAPAAH/hRrOu3KOS1P//77fOfKF381sMKW3n5uaJF1PP3VPEBAQEBAQEBAQEBERERERERARERERERERERERAjAzABIRERERERERERERERERARERERERERERAQEEAQFBAQFBAQEBAQEBAQEREREREREQEREQEREREREiERERIQADAAMgERERIRIREREREREREQERERERERERERFEQRAQFBAQQBAQEBAQEBEREREREBEREREREBEREREhABIRIgIwAAMwACISEQIgEREREREREREREREREREREREREQEUQREBAUEBAQEBEREQIhERERERERERAREREREREQIgIlUlMAADMCBVJSIAEhERERERERERAREREREREREREBERFBQQEBBAEBAQEAERIWYiIiISEREREQEREREREREhUlVVJQADAwMgV1dVIhERERERERERAREQEREREREREREREUFEFBEBBAEBAQERESJmJkREJBIREREBEBERERERcnUlUlUCAwADcnciV1USERERERERERAREBERERERERERAREUEUEREEREEBAQESFmYiZEREQkEBERAQERERERIXdXJ3JVAjMzA3J3InVVJREREREREREQERARERERERERERFBEQERRBEEAQERESEiZiJCRERERAIQERABERERESF3clcnVwIAAAByJ3dXciUREREREREBEREQERERERERERERFBERERFEEBAQERBiZiJEREREREQkABEQARERERFyJyJ3cnUiIiIicndyJyJVEhEREQEAEBERARERERERERERQUEUEREBQQEBARERYmYmRERERESIJAABERERERERcndyJ3cimZmqqipyJ3dSVxIREQAQAREREREQERERERERERQRQREREUEREBARESFiJkREiEREiEQCEBEBEREREXJ3d3InmZmZqqqqKndyd3USERERERAREREREBERERERERERERFEARFBAQERARERIkJERIhERIhEAhAREQEREREhd3d3kpmZmaqqqqpyd3cnEREBEQERERERERARERERERERERERFBQRFBEQEBAREUJERESIRCK0SwIAEREBERERIXd3d5KZmZmpqqqqcndXJxEREREBESERESEQERERERERERERERRBERQRQRERERFCRES0S0REsksCABEREREREREicieZmZmZqaqqqip3IhIREREREREhEhEiAQEREREREREREREUQREUQRQQERERQkREIkJEIkQkIgAREREBERERAiMimZmamZmqqqoqIjMSERERERERASIiAhEQERERERERERERFBFEERQBESEiEiFEREQkRERCREQCEREREREREQIzI5mppJmZqqqqKgAzEhERESEREREiIhIRECERERERERERERQRQUQRERERQiQiRERCJEQiRCREAhAREREBERECM5KZmZqZmamqqqoCMxIREREiERERoqISEQEhEhEREREREREUEUERAQERESFEJEREQiREREQkRAIAERERERERAjOSmZmZmZmZqqqqAjMSEREiIiIRESIiEhEhIiISERERERERFBFBERERARERIkRCRCRCREREAiIAABAREREREQIzkpmZmZmZmZmqqgIzEhEhIiIiIhIgIhAiIiIiIhERERERERQRFBEREREREQFCRERERERERAIAAAAQERERERECM5KZmZmZmZmZmaoCMxIRIiIiIiIiIiIiIiIiIiISEREREREUERQRERERERERIEJERERERCIAAAABEBERERERAjOSmZmZmZqZmZmZAjMSESIiIiIiIiIiIiIiIiIiEhERERERFBEUEQEREREBEREgIkREIiIAAAAQEREREREREQIzkpmZmZmZmZmZmQIzEiEAICIiIiIiIiIiIiIiACARERERERQREREREREREBERAQAiIgAAAAAAEBERERERERECM5KZmpmZmZmZmZkCMxIBEQECICIAIiICICIAAhEBEREREREUEREREREREREREREBAAAAAAAAAAERERERERERAjOSmZmZmZmZmZmZAjMSEREREAECESIiEgECEQARERERESESFCIQERERAREREREREQAAAAAAABEREBEREREREQIzkpmZmZmZmZmZmQIzEhEREREREBECAhIRIBEREBERERERISIRERERERERERERERERAAAAABERERARERERERECM5KZmZmZmZmpmZkCMxIREREREREhEBIgESESERARERERISIiIhEREQERERERERERERERoREREREQERERERERAjOSmZmZmZmZSpqZAjMSERERERERARESAREhEhERERERESGhoiEREREREREREREREREREREREREaEBEREREREQIzIpkpmSmZKakpmQIzEhEREREREREREhERIioRERERERERIiESEREQEREREREREREREREREREREQERERERERECM5IpmSmZKZkpmSkCMxIREREREREREREREaIqEhERERERIRERIREREQERERERERGhEREaERoREREBERERARERAjOSkpKSkpKSkpKSAjMSERERERERERERERGiqiISEREREREREREREREREBEREREREaEREaERERERAREREREREQIzIikpKSkpKSkpKQIzEhERERERERERERERoqoqIhIREREREREREREREREQEREREREREaEREREREREQERERERECMyKSIpIikiKSIpICMxIREREREREREREREaIiIgAiEhERERERERERERARERERERERERoaGqERERERERERERERAjOSIpIikiKSIpIiAjMSEREREREREREREREiAgARwiwiEREREBERARERERERERERGqGhoaEREREREREAEREREQIzIiIiIiIiIiIiIgIzEhERERERERERERERAhAREcLMLCIRERERERERIREREREaEREaGh0aGhGhERERERERERECMyIiIqIiIiIiIioCMxIRERERERERERERERARERHCzCIgIiISERERIiIRERERERERoaGtoRERERERERERERERAjMiIiJKKiIiIiIiAjMSERERERERERERERERERERwiwCASCqKiIiIsLMEBERERGhERoa3RoaoRERERERERAREQIzIiIioiIiIiIiIgIzEhEREREREREREREREREREcIiEBEhqqoiAMLMzBERERERERqh0dehERqhERERERERERECMyIiIiIiIiIiIiICMxIREREREREREREREREREREiAhERIaoqAhEgzMwQERARERERGtp3GhqhERERERERERERAjMiIiIiIiIiIiIiAjMSERERERERERERERERERERAhARESGqKhARIcLMERERERGhEaGh0qERERERoREREREREQIjAAAAAAAAAAAAACAzEhERERERERERERERERERERAREREhKgIREQEiLBERERERERERIhIaERoRIhIRERERERECMjMzMzMzMzMzMzMzMhIRARERERERERERERERERERERERASIQERERICwQEREREREREaIqEhEREUISERERERERIjMzMzMzMzMzMzMzMyMSEREREREREREREREREREREREREREAEREREQEiEREREaEREREiqioRESIkIRIRESIRESIiIiIiIiIiIiIiIiIiEhEREREREREREREREREREREREREiIhERARERABEREREREaERoioqESFEREQkESEkEREAAAAAAAAAAAAAAAAAABAREREREREREREREREREREREREhAAASEREREREREBEREREREaKqEiISIkQkEhIhJBERERERERERERERARERERERARERERERERERERERERERoRERAiAiABEREREREQEREBERERGiqiIkRBEiEkskQhIREREREREREREREREQERERERARERERERERERERERGhEREREQIgABAREREREBERERERERERoipCJERLEbG9JEQSEREREREREREREREREBEREREQERERERERERERERERERERoRECIBAREREREREREREREREiIqIqRCK0vURESyIUIiIREREREREREREREQEQEREREBEREREREREREREREREREREhIgISERERERERERERESEiAACiKkIRQktERERCEQIAIhIRERERERERERERARERERARERERERERERERERERGhEiQkQkIhIRERERERERESECADAzoqoiEhJEREsUESEzMzMjEhEREREREQEREQEREREQERERERERERERERoRGhEiokRKSkQiERERARERESECADMzIiIiMyMiEbS9ISIiIjMzMyMSERERERERERAAEREBEREREREREREREREREaGhokqkREpKRBIREREREBECMDMzIwAAADIzshIRGyIAAAAyMzMzIxEREREREREREQARARERERERERERERoREaERKqKnSkqkREQSEREREREhMDMzMyJEREQyI7srIiIjRLREIjMzMzMSEREREREREREBEAEREREREREREREREREaoSKlp6pKSkqkIhEREREBITMzMyM0QkskMyO7u7srM0LbK0MyMzMzAhEREREREREREQEBERERERERERERERERERpSWqeqqqpKSiQBEREBESEzMzMzQrK9ITOyu7u7uzISsSEkMzMzMwIQEREREREREREREBERERERERERERGhoaGhUnqqVXqqqkoqEREQERABMjMzMzMjIjIzsru7u7syIyIyMzMzMyMAEBERERERERERERARERERERERERoREREaGlKnWlp1qqqqKhEREQEBISAyMzMzMzMzI7u7u7u7KzMzMzMzMyMyAgAREREREREREREQEREREREREREREaGhoSFSVyWidaWqqicSAREQECEAIDIzMzMzMyO7u7u7uyszMzMzMyMyMwIAEREREREREREREBEREREREREREaERGhoqVVfSUnWloqqnEhERAQEBAgAgIjMzMzMju7u7u7srMzMzMyIyMyMAABEREREREREREQERERERERERERERoaGhIVUn0lJ1IlKqpxIQEBAQESACAwAiIiIiIisiIiIiKyIiIiIzMyMCABAREREREREREREREBERERERERoRoREaGip1dyVSddJSpXcSEREBAREBIDIzAAAzM7K7u7u7u7syMzMzMyMCAAARERERERERERERERARERERERERERERoSIidXdVVXUiIlqnAhEREBABEQEgIjMzMzOyu7u7u7u7MjMzMyICAAAQEREREREREREREREBEREREREREREaoSEAIHdyVVV1WlVVdwIBAQEBEREQAjMiIiIisru7u7u7uyIiIiIwIwAAERERERERERERERERARERERERERERERoaAgByIlVVd1VVVXcCERAQEBAREQIzAiAjALK7u7u7u7sCMgIgMCMAERERESEiIiISEREREQERERERERERERGhoQIActJSVXdVVXV3AgEBAQEREBEhIwARAhGyu7u7u7u7AiAAADICEBERESFiZmZmJhIREREREBEREREREREiIiICIHcnLVJ3JSJ1dwIREBAQEBEREAIQISMQsru7u7u7uxIyAhEhABERERFiZmZmZmYmEREREREQEREREREiwlVVJVUiIt0iIiJSdXcCAAEBAQEBESEjACEjELKysrKysrISMgIRMgIQERERIWJmZmYmAhEREREREREREREhwnxVVXdVVVUi3d0iVXd3AhAQEBAQEBECMwIgIxASEhISEhISEjICITAjABEREWImIiIiYiYQEQERERERERERIcxcVcVXVXVVJSIiUlV3dwIAAQEiIiIiAjMiIiNCQkJCQkJCQkIyIiIiIiIiIiIhYmZmZiYSIiIiIiIiIiIiIsJ8d1XMVVVVV1VSd3VVdyciIiIiQUFBQQIzEiEjQUREREREREREMhLCzMzMLEREFCIiIiIiEURERERERERERCTMfFfHzHVVVXxVJXdVdXcnEREUFBQUFBQCMxJBEkRERERERERERCQhIiIiIsJCREQyEhEhI0FEREREREREREQkzHd3x8xXVVXFVSV3dXV3IhERQUERERERAjMSERIREREREREREREhEREREREiLBERMhJEJCMRERERERERERERIcx3d8d8dVdVxVUld1d3dxIRERERIiIiIjIzIiIiIiIiIiIiIiIiIiJEREREISwiIjIiIiIjIiIiIiIiIiIiIiLMfHzHfHd1VcxVJXd3dyIiIiIiIgAAAAAyMwIAAgAAAAAAAwAAACAgRERERCIsAAAyAgAgIwAAAAAAAAAwAAAwwnzMx3x3d3XMVSV3dycyMzMzAwAAAAAAICMAAAAAAAAAMAAAAAAAIiIiIiLCAgAAIAAAAAIAAAAAAAAAAAMAAMLMd8d8d1fHzHcnIiIiMzMzMzMAMzMzMyMjMzMzMzMzMzMzMzMzIyIiIiIiKTMzMyMzMzMyMzMzMzMzMzMzMzPCfMzHfHx3zMx3JzMzMzMzMzMzMwAAAAAgIwAAAAAAAAAAAAAAAAARERERIZICAAAAAAAAAAAAAAAAAAAAAAAAI8zMfMx3zMx8fCIzMzMzMzMzMwMAAAAAAAIAAGAAAAAAAAAAAAAARERERBSSAgAAAAAAAAAAAAAAAAAAAAAAADAiIiLMzMzMx8ciAwAzMzMzMzMDAAAAAAAAAAAGYAYAAAAAAAAAMEREREQkkgIAAAAAAAAAAAAAAAAAAAAAAAAAMyMyIyIizMwiMzMAAAAwMzMDADMzMzMzMzNjbDYzMzMzMzMzMyMiIiIiIikzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMyMiMjMzMzMzMzMzMzMAAAAAAABgxsxsZgYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAwAAAAAAMDMzMzMzMzMzMwAAAAAAAAAwAAAAAAAAAGBsBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMAAAAAAAAAADMzMzMzMzMAAAAAAAAAAAAAAAAAAAAABmAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAwAAAAAAAAAAAAAwMzMDAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMwAAAAAAAAAAAAAAMAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADADAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAANDddwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMwAAAAAAAAAAADMAIgIiIiIAAADAzAAAAAAAAAAAAN19fdcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AjAAAwMDMGJmasbMXMXMzMxmZmZmZmZqpmpmZmZmZmZmZmpmZmZqZmZmZmZmZmaqZmpmZmZmZmZmZmZmZmqmZiYAMDAwMABiZmqmZszMzMxmzGZmZmaqZmpmZmZmZmZmZqZmZmZmpmZmZmZmZmZmZmqmamZmZmZmZmZmZmZqpmYmAAMDMzMjZqZmamZmZmZsZmZsZmamZqZmZmZmZmZmZmZqZmZmZmZqZmZmZmZmZmamZqZmZmZmZmZmZmZmpmZqZjIzMzAwYmZqpmZmZmbGZmZmZmZmaqZqZmZmZmZmZmZmamZmZmZmamZmZmZmZmZmZqpmamZmZmZmZmZmZmZqpmYmAwMDA2JmaqZmZmZmZmZmZmZmpmZqZmZmZmZmZmZmpmZmZmZmZqZmZmZmZmZmZmZmaqZmZmZmZmZmZmZmaqZmJjAwMCBmpmZqZmZmZmZmZmZmZmqmZmZmZmZmZmZmZmpmZmZmZmZmamZmZmZmZmZmZqZmamZmZmZmZmZmZqZmOmYCAwNiZmqmZmZmZmZmZmZmZqZmamZmZmZmZmZmZmZqZmZmZmZmZmpmZmZmZmZmZmZmaqZmZmZmZmZmZmZmaqZmJjAwYmZqpmZmZmZmZmZmZmampqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqmZmZmZmZmZmZmZmqmZiYDI2amZmpmZmZmZmZmZmZmaqamZmZmZmZmZmZmamZmZmZmZmZmZmpmZmZmZmZmZqamZmpmZmZmZmZmZmamZmpmMmJmaqZmZmZmZmZmZmZmZmpqZqpmZmZmZmZmZmpmZmZmZmZmZmZqZmZmZmZmZqZqZmpqZmZmZmZmZmZmZmqmZiYHBg==";
-const PRESETS = {"pistol": "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IhEREiIRERIiETAAAAMRIiIREiIiIhESIiETAAADESIhERIhESIRESIhEwAAAxEiIREiERESIREiIRMAAAMRIiERIhEREiERIiETAAADESIhESIRERIhESIhEwAAAxEiIRESIREiEREiIRMAAAMRIiIREiIiIhESIiETAAAAMRIiERESIhEREiIRMAAAADESIiERERERESIiETAAAAAxESIiERERERIiIREwAAAAAxESIiIRERIiIhETAAAAAAAxESIiIiIiIiERMAAAAAAAAxESIiIiIiIREwAAAAAAAAAxERIiIiIRETAAAAAAAAAAAxERERERERMAAAAAAAAAAAAzMRERETMwAAAAAAAAAAAAAAMzMzMAAAAAAAAAAAAAAAAAREQAAAAAAAAAAAAAAAAAAEREAAAAAAAAAAAAAAAAAABERAAAAAAAAAAAAAAAAAAAREQAAAAAAAAAAAAAAAAAAEREAAAAAAAAAAIeICAMAAH/B+AxXP//Lv8UHiCjMo8yjzKPMo8yjzKPAAAAAAAABVVVVQAAAAAAAAAAAAAAVVERERFVUAAAAAAAAAAABREREUERERUAAAAAAAAAAFEREiJCIhERUAAAAAAAAAUREiIkNCIiERUAAAAAAABRQSIiJDQiIiERUAAAAAAFERRCIhQ0EiIiRBUAAAAAUREkNBEUNBESREERUAAAAFESIkNEQzNBRDQiEVAAAABREiIUM0MzRDNCIhFQAAAFESIiFDMzMzMzQiIhFQAABREiIRRDNVUzNBEiIRUAAAURIkRDM1VVU0RBIiEVAAAFFEQzMzNVVVMzNERBFQAABEQzMzMzVVVTMzMzNEQAAAURREQzMzVVMzM0REEVAAAFESIiREMzMzNEQiIhFQAAAFESIhFDMzMzNBIiEVAAAABREiIkMzNDMzQiIhFQAAAAUREiJDM0FEMzQiERUAAAAAUREiQzQREUQ0IRFQAAAAAAURFDRCIiIiQ0EVAAAAAAAAURRCIiIiIiRBUAAAAAAAAAVEESIiIiERFAAAAAAAAAAAQREREREREVAAAAAAAAAAAAVVERERFVUAAAAAAAAAAAAAAFVVVVAAAAAAAAAAAAAAAAAGZmAAAAAAAAAAAAAAAAAABmZgAAAAAAAAAAAAAAAAAAZmYAAAAAAAAAAAAAAAAAAGZmAAAAAAAAAAAAAAAAAABmZgAAAAAAAADYPQ==", "skateboard": "VEFNQUdPAFQAYQBtAGEATwBTACAAcwBrAGEAdABlAGIAbwBhAHIAZAAAAAAAAAAAAAAM5nRnMTZfYXMwMzMwMl8xAAAAAAAAAAAHhgIBgQQqAWCle/eToHJTDOYAAATyBOoE4ATzBOQE4QTuBOAE8QTjAAAAAAABIiIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAEAAAAgAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAIB4NAAH/B+Agozrefz99XzFFMUUxRTFFMUUxRTFFMUUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREREREREREREREQAAAAEiRERERERERERERCIQAAABIiIiIiIiIiIiIiIiEAAAABEREREREREREREREQAAAAAAAFVQAAAAAAVVAAAAAAAAAAEzMQAAAAATMxAAAAAAAAATMzMQAAABMzMxAAAAAAAAETMxEAAAARMzEQAAAAAAAAEREQAAAAARERAAAAADfjAkDAAB/wfgIKM63n1ffz///zFFMUUxRTFFMUUxRQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFVVVVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABVVVVQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREREREREREREREAAAABIjMzMzMzMzMzMzMzMzMzMzMzMyIQAAABIiIiIiIiIiIiIiIiIiIiIiIiIiIQAAAAEREREREREREREREREREREREREREAAAAAAABmYAAAAAAAAAAAAAAAAAZmAAAAAAAAAAFEQQAAAAAAAAAAAAAAABREEAAAAAAAABRERBAAAAAAAAAAAAAAAUREQQAAAAAAABFEQRAAAAAAAAAAAAAAARREEQAAAAAAAAEREQAAAAAAAAAAAAAAABEREAAAAE0C", "pizza": "VEFNQUdPAFQAYQBtAGEATwBTACAAcABpAHoAegBhAAAAAAAAAAAAAAAAAAAAAAAAAAAJ5nRnMTZfb3kwMzEwMV8xAAAAAAAAAAAFygIBgQEBApaofuBZl7CkDB0AAATvBOgE+QT5BOAAAAAAAAAAAAAAAAAAAAABAAABAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAEAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIiIiIiIiIiIgAAACREREREREREQgAAACREREREREREQgAAACIiIiIiIiIiIgAAAAARMxEREVERIAAAAAATMzERMxERAAAAAAADMzETMzESAAAAAAABMxETMzEQAAAAAAAAERERMxEgAAAAAAAAURMxEREAAAAAAAAAATMzERIAAAAAAAAAAjMzERIAAAAAAAAAABMxESAAAAAAAAAAACERESAAAAAAAAAAAAEVEgAAAAAAAAAAAAIREgAAAAAAAAAAAAARIAAAAAAAAAAAAAAhIAAAAAAAAAAAAAACAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIiIiIiIiIiIgAAACREREREREREQgAAACREREREREREQgAAACIiIiIiIiIiIgAAAAARMxEREVERIAAAAAATMzERMxERAAAAAAADMzETMzESAAAAAAABMxETMzEQAAAAAAAAERERMxEgAAAAAAAAURMxEREAAAAAAAAAATMzERIAAAAAAAAAAjMzERIAAAAAAAAAABMxESAAAAAAAAAAACERESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE8GBgLAAH/B+AgozPZRn8pWaefp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREREREREREQAAABIiIiIiIiIiIQAAABIiIiIiIiIiIQAAABEREREREREREQAAAAAzRDMzM1MzEAAAAAA0REMzRDMzAAAAAAAEREM0REMxAAAAAAADAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGnq", "burger": "VEFNQUdPAFQAYQBtAGEATwBTACAAYgB1AHIAZwBlAHIAAAAAAAAAAAAAAAAAAAAAAAAKMHRnMTZfZ2gwMzIwMV8xAAAAAAAAAAAF3AIBgQEBAWhOdZ9ImaZ8DIEAAAThBPQE8QTmBOQE8QAAAAAAAAAAAAAAAAABAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwFGGBgQAAH/B+BFHSCjKg9EvEXrPp/Xv9e/17/Xv9e/17/Xv9e/178AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAiIiIAAAAAAAAAAiIREREiIAAAAAAAIRERFxEREgAAAAACERcRERERESAAAAAhERERERFxERIAAAIhEREXERERERIgAAIREREREREREREgAAVVVVVVVVVVVVVQAAVVVVVVVVVVVVVQAABmZmZmZmZmZmYAAAIzMzMzMzMzMzMgAAIzMzMzMzMzMzMgAAIzMzMzMzMzMzMgAAIiIiIiIiIiIiIgAAAkREREREREREIAAAJEREREREREREQgAAIkREREREREREIgAAAiIiIiIiIiIiIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABRhgYEAAB/wfgRR0go0S8Kg9F6z6f17/Xv9e/17/Xv9e/17/Xv9e/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIiIiAAAAAAAAAAIiERERIiAAAAAAACERERcRERIAAAAAAhEXEREREREgAAAAIRERERERcREAAAACIRERFxERERAAAAACEREREREREQAAAAAFVVVVVVVVVQAAAAAFVVVVVVVVVQAAAAAAZmZmZmZmZgAAAAACRERERERERAAAAAACREREREREREAAAAACREREREREREQAAAACIiIiIiIiIiIgAAAAIzMzMzMzMzMyAAACMzMzMzMzMzMzIAACIzMzMzMzMzMyIAAAIiIiIiIiIiIiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUYYGBAAAf8H4CCjRR0qD0S8Res+n9e/17/Xv9e/17/Xv9e/17/XvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREAAAAAAAAAABESIiAAAAAAAAAAASIiIgAAAAAAAAAAEiJyIAAAAAAAAAABIiIiIAAAAAAAAAARIiIicAAAAAAAAAASIiIiIAAAAAAAAABVVVVVUAAAAAAAAABVVVVVVQAAAAAAAAAGZmZmZmAAAAAAAAATMzMzMzAAAAAAAAATMzMzMwAAAAAAAAATMzMzMwAAAAAAAAAREREREQAAAAAAAAABRERERAAAAAAAAAAURERERAAAAAAAAAARREREREAAAAAAAAABEREREREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKBM"};
+const PRESETS = {"pistol": "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", "skateboard": "VEFNQUdPAFQAYQBtAGEATwBTACAAcwBrAGEAdABlAGIAbwBhAHIAZAAAAAAAAAAAAAAM5nRnMTZfYXMwMzMwMl8xAAAAAAAAAAAHhgIBgQQqAWCle/eToHJTDOYAAATyBOoE4ATzBOQE4QTuBOAE8QTjAAAAAAABIiIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAEAAAAgAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAIB4NAAH/B+Agozrefz99XzFFMUUxRTFFMUUxRTFFMUUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREREREREREREREQAAABAiRERERERERERERCIBAAAQIiIiIiIiIiIiIiIiAQAAABEREREREREREREREQAAAAAAAFUFAAAAAFBVAAAAAAAAABAzEwAAAAAxMwEAAAAAAAAxMzMBAAAQMzMTAAAAAAAAETMTAQAAEDEzEQAAAAAAABAREQAAAAAREQEAAAADfjAkDAAB/wfgIKM63n1ffz///zFFMUUxRTFFMUUxRQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFVVVQUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABVVVUFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREREREREREREREAAAAQIjMzMzMzMzMzMzMzMzMzMzMzMyIBAAAQIiIiIiIiIiIiIiIiIiIiIiIiIiIBAAAAEREREREREREREREREREREREREREAAAAAAABmBgAAAAAAAAAAAAAAAGBmAAAAAAAAABBEFAAAAAAAAAAAAAAAAEFEAQAAAAAAAEFERAEAAAAAAAAAAAAAEEREFAAAAAAAABFEFAEAAAAAAAAAAAAAEEFEEQAAAAAAABAREQAAAAAAAAAAAAAAABERAQAAAExs", "pizza": "VEFNQUdPAFQAYQBtAGEATwBTACAAcABpAHoAegBhAAAAAAAAAAAAAAAAAAAAAAAAAAAJ5nRnMTZfb3kwMzEwMV8xAAAAAAAAAAAFygIBgQEBApaofuBZl7CkDB0AAATvBOgE+QT5BOAAAAAAAAAAAAAAAAAAAAABAAABAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAEAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIiIiIiIiIiICAAAgREREREREREQCAAAgREREREREREQCAAAgIiIiIiIiIiICAAAAEDETERFRESEAAAAAEDMzETETEQEAAAAAADMzETMzEQIAAAAAADETETMzEQAAAAAAABARETETIQAAAAAAAFARMxERAQAAAAAAAAAxMxMRAgAAAAAAAAAyMxMRAgAAAAAAAAAQMxEhAAAAAAAAAAAgEREhAAAAAAAAAAAAERUCAAAAAAAAAAAAEhECAAAAAAAAAAAAECEAAAAAAAAAAAAAICEAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIiIiIiIiIiICAAAgREREREREREQCAAAgREREREREREQCAAAgIiIiIiIiIiICAAAAEDETERFRESEAAAAAEDMzETETEQEAAAAAADMzETMzEQIAAAAAADETETMzEQAAAAAAABARETETIQAAAAAAAFARMxERAQAAAAAAAAAxMxMRAgAAAAAAAAAyMxMRAgAAAAAAAAAQMxEhAAAAAAAAAAAgEREhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE8GBgLAAH/B+AgozPZRn8pWaefp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEREREREREREBAAAQIiIiIiIiIiIBAAAQIiIiIiIiIiIBAAAQEREREREREREBAAAAMEM0MzNTMxMAAAAAMEREM0M0MwMAAAAAAEREM0REMwEAAAAAAAMAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGpT", "burger": "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"};
 const SVC = "0000fff0-0000-1000-8000-00805f9b34fb";
 const WRITE = "0000fff2-0000-1000-8000-00805f9b34fb";
 const NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb";
+const DATA = "data/";
+
 function describe(e) {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
   if (e && typeof e === "object") { try { return JSON.stringify(e); } catch {} }
   return `${typeof e} ${String(e)}`;
 }
-const SENDER_ID = [0x7c,0x68,0x48,0x97,0x75,0xa6,0x4e,0x99];
-const START = Uint8Array.of(0xf0,0x8d), END = Uint8Array.of(0xf0,0xcd), YOUR_TURN = Uint8Array.of(0xf0,0x8e,0x0d);
-const CONTROL = new Set([0x0c,0x0d,0x4d,0x8d,0xcd,0x8e]);
-
 const $ = id => document.getElementById(id);
 const logLines = [];
 const t0 = performance.now();
 const hex = u8 => Array.from(u8, b => b.toString(16).padStart(2,"0")).join("");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a));   // like .NET Random.Next(a, b): a <= n < b
 function log(s) {
   logLines.push(((performance.now()-t0)/1000).toFixed(3).padStart(8) + "  " + s);
-  const box = $("logBox");
-  box.textContent = logLines.slice(-400).join("\n");
-  box.scrollTop = box.scrollHeight;
+  const box = $("logBox"); box.textContent = logLines.slice(-400).join("\n"); box.scrollTop = box.scrollHeight;
 }
 function lcd(state, main) { if (state) $("lcdState").textContent = state; if (main !== undefined) $("lcdMain").textContent = main; }
 function progress(p) { const v = Math.max(0, Math.min(100, Math.round(p))); $("barFill").style.width = v + "%"; $("lcdPct").textContent = v + "%"; }
 function show(el, text, kind) { el.hidden = false; el.className = "msg " + (kind||""); el.textContent = text; }
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const toB64 = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); };
 
-// ---------- message building (matches the MyMeets bytes exactly) ----------
-// Layout taken from MyMeets' own message builder:
-//   0x48 u32 total length · 0x4c operand 0x17 · 0x52 8-byte security code
-//   0x5e COMMAND (0x00 hello, 0x3a send item; the Tama answers with command + 1)
-//   0xbb 0x03 marker + 0xbc u32 Gotchi Points (only when points > 0; MyMeets allows up to 99,999)
-//   0xd4 u32 256 when an item is attached · 0xf8 format code
-const CMD_HELLO = 0x00, CMD_ITEM = 0x3a, MAX_POINTS = 99999;
-function header(totalLen, command, points, hasItem) {
-  const h = new Uint8Array(0x100), dv = new DataView(h.buffer);
-  h.set([0x54,0x41,0x4d,0x41,0x47,0x4f], 0);           // "TAMAGO"
-  dv.setUint32(0x48, totalLen, true);
-  h[0x4c] = 0x17;
-  h.set(SENDER_ID, 0x52);
-  h[0x5e] = command;
-  if (points > 0) { h[0xbb] = 0x03; dv.setUint32(0xbc, points, true); }
-  if (hasItem) dv.setUint32(0xd4, 256, true);
-  h.set([0x10,0x00,0x01,0x04], 0xfc);
-  return h;
+// ---------- tabs ----------
+const tabs = ["shop", "custom", "marry"];
+function selectTab(name) {
+  for (const t of tabs) {
+    const on = t === name;
+    $("tab-" + t).setAttribute("aria-selected", on); $("tab-" + t).tabIndex = on ? 0 : -1; $("panel-" + t).hidden = !on;
+  }
+  $("sendArea").hidden = name === "marry";
+  store.set("tamaos_tab", name);
+  if (name === "shop") loadCatalog(); if (name === "marry") loadCharacters();
+  refreshLcdItem();
 }
-function finish(body) {
-  let s = 0; for (const b of body) s = (s + b) & 0xffff;
-  const out = new Uint8Array(body.length + 2); out.set(body); out[body.length] = s & 0xff; out[body.length+1] = s >> 8;
-  return out;
+tabs.forEach((t, i) => {
+  $("tab-" + t).addEventListener("click", () => selectTab(t));
+  $("tab-" + t).addEventListener("keydown", e => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+    const n = tabs[(i + d + tabs.length) % tabs.length]; selectTab(n); $("tab-" + n).focus();
+  });
+});
+const activeTab = () => tabs.find(t => !$("panel-" + t).hidden);
+
+// ---------- message building (matches MyMeets' BLETmgcPacket.Compile) ----------
+// 0x00 "TAMAGO" · 0x42 3 colour bytes (marriage) · 0x48 u32 total length · 0x4c operand · 0x52 8-byte security code
+// 0x5e command · 0x5f..0xba marriage record · 0xbb 0x03 + 0xbc u32 Gotchi Points · 0xcc/0xd0/0xec section offsets (marriage)
+// 0xd4 u32 256 when an item is attached · 0xf8 format code · 0x100 attached sections · u16 checksum (sum of all bytes)
+const SENDER_ID = [0x7c,0x68,0x48,0x97,0x75,0xa6,0x4e,0x99];
+const START = Uint8Array.of(0xf0,0x8d), END = Uint8Array.of(0xf0,0xcd), YOUR_TURN = Uint8Array.of(0xf0,0x8e,0x0d);
+const CONTROL = new Set([0x0c,0x0d,0x4d,0x8d,0xcd,0x8e]);
+const OP = { visit: 0x14, back: 0x15, marriage: 0x16, item: 0x17 };
+const CMD = { start: 0x00, visit: 0x34, back: 0x36, marriage: 0x38, item: 0x3a };
+const MAX_POINTS = 99999;
+function compilePacket(operand, command, size, { points = 0, item = null, mar = null } = {}) {
+  const raw = new Uint8Array(size), dv = new DataView(raw.buffer);
+  raw.set([0x54,0x41,0x4d,0x41,0x47,0x4f], 0);
+  if (mar) raw.set(mar.colors, 0x42);
+  dv.setUint32(0x48, size, true); raw[0x4c] = operand;
+  raw.set(SENDER_ID, 0x52); raw[0x5e] = command;
+  let end;
+  if (mar) {
+    const v = mar.visit;
+    raw[0x5f] = v.sex; raw.set(v.username.subarray(0, 16), 0x60);
+    dv.setUint16(0x72, v.rid1, true); dv.setUint16(0x74, v.id, true);
+    dv.setUint16(0x7a, v.generation, true); raw[0x7c] = v.growth; raw[0x83] = v.twins;
+    dv.setUint16(0x84, v.unk1, true); dv.setUint16(0x86, v.unk2, true); raw[0x88] = mar.bKind; raw[0x89] = mar.pKind;
+    dv.setUint16(0x8a, v.birthday, true); dv.setUint16(0x8e, v.rid2, true);
+    raw.set(v.dnaPattern, 0x98); raw[0xa0] = mar.dnaValue; raw[0xa1] = mar.sex; raw.set(v.palette, 0xa2);
+    raw.set(mar.dnaPattern, 0xa5); raw[0xad] = mar.dnaValue;
+  }
+  if (points > 0) { raw[0xbb] = 0x03; dv.setUint32(0xbc, points, true); }
+  if (mar) { dv.setUint32(0xcc, 0x100, true); dv.setUint32(0xd0, 0x810c, true); dv.setUint32(0xec, 0x8198, true); }
+  if (item) dv.setUint32(0xd4, 256, true);
+  raw.set([0,0,0,0,0x10,0x00,0x01,0x04], 0xf8);
+  if (item) {
+    dv.setUint32(0x100, 2, true); dv.setUint32(0x104, 1, true); dv.setUint32(0x108, item.length, true);
+    raw.set(item, 0x10c); end = 0x10c + item.length + 4;
+  } else if (mar) {
+    dv.setUint32(0x104, 1, true); dv.setUint32(0x108, 0x8000, true);
+    raw.set(mar.charData.subarray(0, 0x8000), 0x10c); raw.set(mar.visit.info, 0x810c); raw.set(mar.visit.parents, 0x8198);
+    end = 0x8198 + mar.visit.parents.length;
+  } else end = 0x100;
+  let s = 0; for (const b of raw) s = (s + b) & 0xffff;
+  raw[end] = s & 0xff; raw[end + 1] = s >> 8;
+  return raw;
 }
-function helloMsg() { return finish(header(0x102, CMD_HELLO, 0, false)); }
-function itemMsg(item, points) {
-  const tail = new Uint8Array(12 + item.length + 4), dv = new DataView(tail.buffer);
-  dv.setUint32(0, 2, true); dv.setUint32(4, 1, true); dv.setUint32(8, item.length, true);
-  tail.set(item, 12);
-  const total = 0x100 + tail.length + 2;
-  const body = new Uint8Array(0x100 + tail.length); body.set(header(total, CMD_ITEM, points, true)); body.set(tail, 0x100);
-  return finish(body);
+const helloMsg = (op = OP.item) => compilePacket(op, CMD.start, 0x102);
+const itemMsg = (item, points) => compilePacket(OP.item, CMD.item, 0x100 + 12 + item.length + 4 + 2, { points, item });
+function replyCommand(status) {
+  return status.length >= 0x60 && String.fromCharCode(...status.slice(0,6)) === "TAMAGO" ? status[0x5e] : null;
 }
+
+// ---------- item files (big-endian) ----------
 function itemInfo(item) {
   if (item.length < 0x4a || String.fromCharCode(...item.slice(0,6)) !== "TAMAGO") return null;
   let name = ""; for (let i = 6; i + 1 < 0x32; i += 2) { const c = (item[i] << 8) | item[i+1]; if (!c) break; name += String.fromCharCode(c); }
   let id = ""; for (let i = 0x34; i < 0x4a && item[i]; i++) id += String.fromCharCode(item[i]);
   return { name, id };
 }
-// Wallpaper items: shop price is a big-endian u16 at 0x76; the last 2 bytes are a
-// big-endian checksum (sum of every earlier byte & 0xffff). Verified on tg19_bg50001.
-function isWallpaper(item) {
-  return item.length === 0x222a && item[0x200 + 4] === 0x80 && item[0x200 + 5] === 0x80;
-}
+function isWallpaper(item) { return item.length === 0x222a && item[0x200 + 4] === 0x80 && item[0x200 + 5] === 0x80; }
 function itemChecksum(item) { let s = 0; for (let i = 0; i < item.length - 2; i++) s = (s + item[i]) & 0xffff; return s; }
 function withPrice(item, price) {
-  const out = item.slice();
-  out[0x76] = (price >> 8) & 0xff; out[0x77] = price & 0xff;
+  const out = item.slice(); out[0x76] = (price >> 8) & 0xff; out[0x77] = price & 0xff;
   const c = itemChecksum(out); out[out.length - 2] = c >> 8; out[out.length - 1] = c & 0xff;
   return out;
 }
-function replyCommand(status) {
-  return status.length >= 0x60 && String.fromCharCode(...status.slice(0,6)) === "TAMAGO" ? status[0x5e] : null;
+
+// Tamagotchi text ("mojis"): byte pairs [language, row<<4 | column] into this table (from MyMeets' TamagoString).
+const MOJIS = ["　あいうえおかきくけこさしすせそ","たちつてとなにぬねのはひふへほま","みむめもやゆよらりるれろわをんぁ",
+ "ぃぅぇぉっゃゅょがぎぐげござじず","ぜぞだぢづでどばびぶべぼぱぴぷぺ","ぽー～…、。()「」.・!?&○",
+ "×┣◎★┳♪┫↑↓→←￥　012","3456789アイウエオカキクケ","コサシスセソタチツテトナニヌネノ",
+ "ハヒフヘホマミムメモヤユヨラリル","レロワヲンァィゥェォッャュョガギ","グゲゴザジズゼゾダヂヅデドバビブ",
+ "ベボパピプペポヴ        ","│┌┐┘└├┬┤┴┼━┃┏┓┛┗","ABCDEFGHIJKLMNOP","QRSTUVWXYZ%-+  \n"];
+const EN_CHARS = "ABCDEFGHIKLMNOPQRSTUVWXYZ !%-+\n0123456789";
+function toMojis(text) {
+  text = text.toUpperCase();
+  const lang = [...text].every(c => EN_CHARS.includes(c)) ? 8 : 4;
+  const out = new Uint8Array(text.length * 2); let k = 0;
+  for (const c of text) MOJIS.forEach((row, r) => { const i = row.indexOf(c); if (i >= 0 && k + 1 < out.length) { out[k] = lang; out[k+1] = (r << 4) | i; k += 2; } });
+  return out;
+}
+// The shop name lives at 0x5e (up to 11 letters).
+function setDisplayName(out, text) {
+  for (let i = 0x5e; i < 0x76; i++) out[i] = 0;
+  [...text.toLowerCase()].filter(c => c >= "a" && c <= "z").slice(0, 11)
+    .forEach((c, i) => { const v = 0x04e0 + c.charCodeAt(0) - 97; out[0x5e + 2*i] = v >> 8; out[0x5f + 2*i] = v & 255; });
 }
 
-// ---------- wallpaper codec ----------
-// 128x128 wallpaper item layout (decoded from tg19_bg50001):
-//   0x006 UTF-16BE name (22 chars max)   0x034 ASCII asset ID "tg19_bgNNNNN"
-//   0x05a u16 BE wallpaper number (0xc351 = 50001, matches the ASCII ID)   0x076 u16 BE shop price
-//   0x200 image header "00 01 20 24 80 80 0f 00 01 ff" (0x80 0x80 = 128x128)
-//   0x20a palette: 15 colors, u16 big-endian BGR565
-//   0x228 pixels: 4 bits each, 2 per byte, left pixel in the high nibble, rows top to bottom
-//   last 2 bytes: u16 BE sum of every earlier byte
-const PAL_AT = 0x20a, PAL_N = 15, PIX_AT = 0x228;
-function bgr565ToRgb(v) { const b = (v >> 11) & 31, g = (v >> 5) & 63, r = v & 31; return [r * 255 / 31 | 0, g * 255 / 63 | 0, b * 255 / 31 | 0]; }
+// ---------- images ----------
+// Frame: w, h, colour count, u16 1 or 256, 0xff, palette (u16 big-endian BGR565), pixels.
+// Up to 16 colours: 4 bits per pixel, LOW nibble first (MyMeets' TamagoImage; matches the official art).
+function bgr565ToRgb(v) { return [(v & 31) * 255 / 31 | 0, ((v >> 5) & 63) * 255 / 63 | 0, ((v >> 11) & 31) * 255 / 31 | 0]; }
 function rgbToBgr565(r, g, b) { return ((b >> 3) << 11) | ((g >> 2) << 5) | (r >> 3); }
-function decodeWallpaper(item) {
-  const pal = []; for (let i = 0; i < PAL_N; i++) pal.push(bgr565ToRgb((item[PAL_AT + 2*i] << 8) | item[PAL_AT + 2*i + 1]));
-  pal.push([0, 0, 0]);
-  const out = new ImageData(128, 128);
-  for (let i = 0; i < 8192; i++) {
-    const b = item[PIX_AT + i];
-    for (const [k, n] of [[0, b >> 4], [1, b & 15]]) { const c = pal[n], o = (i * 2 + k) * 4; out.data[o] = c[0]; out.data[o+1] = c[1]; out.data[o+2] = c[2]; out.data[o+3] = 255; }
+function decodeFrame(buf, o) {
+  const ver = (buf[o+3] << 8) | buf[o+4]; if (ver !== 1 && ver !== 256) return null;
+  const w = buf[o], h = buf[o+1], nc = buf[o+2];
+  if (!w || !h) return null;
+  const pal = []; for (let i = 0; i < nc; i++) pal.push(bgr565ToRgb((buf[o+6+2*i] << 8) | buf[o+7+2*i]));
+  const px = new Uint8ClampedArray(w * h * 4), p0 = o + 6 + 2 * nc;
+  const put = (i, k) => { const c = pal[k]; if (!c) return; px[i*4] = c[0]; px[i*4+1] = c[1]; px[i*4+2] = c[2]; px[i*4+3] = 255; };
+  if (nc <= 16) for (let i = 0; i < (w * h >> 1); i++) { const b = buf[p0 + i]; put(2*i, b & 15); put(2*i+1, b >> 4); }
+  else for (let i = 0; i < w * h; i++) put(i, buf[p0 + i]);
+  return { w, h, px };
+}
+function frameSize(buf, o) {
+  const w = buf[o], h = buf[o+1], nc = buf[o+2], ver = buf[o+3] | (buf[o+4] << 8);
+  if (ver !== 1 && ver !== 256) return 0;
+  return 6 + (nc <= 16 ? (w * h) >> 1 : w * h) + nc * 2;
+}
+function keyOut(img) {           // pixel (0,0) is the see-through colour
+  const p = img.px, r = p[0], g = p[1], b = p[2], a = p[3];
+  for (let i = 0; i < p.length; i += 4) if (p[i] === r && p[i+1] === g && p[i+2] === b && p[i+3] === a) p[i] = p[i+1] = p[i+2] = p[i+3] = 0;
+  return img;
+}
+// Item frames start at 0x200 (0x5c2 for accessories): u16 count, then u16 size + frame each.
+function itemFrames(item) {
+  const dest = ((item[0x4e] << 24) | (item[0x4f] << 16) | (item[0x50] << 8) | item[0x51]) >>> 0;
+  let o = dest === 0x81023400 || dest === 0x81023500 ? 0x5c2 : 0x200;
+  if (o + 2 > item.length) return [];
+  const n = (item[o] << 8) | item[o+1]; o += 2; const out = [];
+  for (let f = 0; f < n && o + 8 < item.length; f++) {
+    const size = (item[o] << 8) | item[o+1];
+    const fr = decodeFrame(item, o + 2); if (fr) out.push(keyOut(fr));
+    o += 2 + size;
   }
   return out;
 }
-function drawPreview(imgData, label) {
-  const cv = $("preview"); cv.getContext("2d").putImageData(imgData, 0, 0);
-  $("previewLabel").textContent = label; $("previewBox").hidden = false;
+function frameToCanvas(img) {
+  const c = document.createElement("canvas"); c.width = img.w; c.height = img.h;
+  c.getContext("2d").putImageData(new ImageData(img.px, img.w, img.h), 0, 0); return c;
 }
-// Median cut on 5-6-5 values, then nearest-color mapping with optional Floyd-Steinberg.
+function drawFit(cv, frameCanvas, crop) {
+  const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!frameCanvas) return;
+  let [sx, sy, sw, sh] = [0, 0, frameCanvas.width, frameCanvas.height];
+  if (crop) {                            // zoom to the visible pixels (accessories sit in a big empty frame)
+    const d = frameCanvas.getContext("2d").getImageData(0, 0, sw, sh).data; let x0 = sw, y0 = sh, x1 = -1, y1 = -1;
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (d[(y * sw + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= 0) [sx, sy, sw, sh] = [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+  }
+  const s = Math.max(1, Math.floor(Math.min(cv.width / sw, cv.height / sh)));
+  ctx.drawImage(frameCanvas, sx, sy, sw, sh, (cv.width - sw*s) >> 1, (cv.height - sh*s) >> 1, sw*s, sh*s);
+}
+const animTimers = new Map();
+function animate(cv, frames) {
+  clearInterval(animTimers.get(cv));
+  const fc = frames.map(frameToCanvas); let i = 0;
+  const draw = () => { drawFit(cv, fc[i % Math.max(1, fc.length)]); i++; };
+  draw();
+  if (fc.length > 1 && !matchMedia("(prefers-reduced-motion: reduce)").matches) animTimers.set(cv, setInterval(draw, 600));
+}
+
+// ---------- wallpaper codec (128x128, 15 colours) ----------
+const PAL_AT = 0x20a, PAL_N = 15, PIX_AT = 0x228;
+function decodeWallpaper(item) { const f = decodeFrame(item, 0x204); return new ImageData(f.px, 128, 128); }
+function drawPreview(imgData, label) { $("preview").getContext("2d").putImageData(imgData, 0, 0); $("previewLabel").textContent = label; $("previewBox").hidden = false; }
+// Median cut, then nearest colour with optional Floyd-Steinberg dithering.
 function quantize(rgba, n, dither) {
   const px = []; for (let i = 0; i < rgba.length; i += 4) px.push([rgba[i], rgba[i+1], rgba[i+2]]);
   let boxes = [px.slice()];
@@ -326,7 +556,7 @@ function quantize(rgba, n, dither) {
     boxes.splice(bi, 1, bx.slice(0, mid), bx.slice(mid));
   }
   let pal = boxes.map(bx => { const s = [0,0,0]; for (const p of bx) { s[0]+=p[0]; s[1]+=p[1]; s[2]+=p[2]; } return s.map(v => Math.round(v / bx.length)); });
-  pal = pal.map(([r,g,b]) => bgr565ToRgb(rgbToBgr565(r,g,b)));           // snap to what the screen can show
+  pal = pal.map(([r,g,b]) => bgr565ToRgb(rgbToBgr565(r,g,b)));
   while (pal.length < n) pal.push([0,0,0]);
   const near = (r,g,b) => { let bi = 0, bd = 1e9; pal.forEach((c, i) => { const d = (c[0]-r)**2*0.30 + (c[1]-g)**2*0.59 + (c[2]-b)**2*0.11; if (d < bd) { bd = d; bi = i; } }); return bi; };
   const W = 128, f = Float32Array.from(px.flat()), idx = new Uint8Array(W*W);
@@ -340,15 +570,9 @@ function quantize(rgba, n, dither) {
   }
   return { pal, idx };
 }
-// The Tama shows names in its own font: a = 0x04e0 ... z = 0x04f9, stored at 0x5e (up to 11 letters).
-function setDisplayName(out, text) {
-  for (let i = 0x5e; i < 0x76; i++) out[i] = 0;
-  [...text.toLowerCase()].filter(c => c >= "a" && c <= "z").slice(0, 11)
-    .forEach((c, i) => { const v = 0x04e0 + c.charCodeAt(0) - 97; out[0x5e + 2*i] = v >> 8; out[0x5f + 2*i] = v & 255; });
-}
-function buildWallpaper(template, pal, idx, name, idNum, displayName) {
+function buildWallpaper(template, pal, idx, name, idNum) {
   const out = template.slice();
-  setDisplayName(out, displayName === undefined ? name : displayName);
+  setDisplayName(out, name);
   const assetId = "tg19_bg" + idNum;
   out[0x5a] = (idNum >> 8) & 255; out[0x5b] = idNum & 255;
   for (let i = 0x06; i < 0x32; i++) out[i] = 0;
@@ -356,77 +580,43 @@ function buildWallpaper(template, pal, idx, name, idNum, displayName) {
   for (let i = 0x34; i < 0x4a; i++) out[i] = 0;
   [...assetId].slice(0, 21).forEach((ch, i) => { out[0x34 + i] = ch.charCodeAt(0); });
   pal.slice(0, PAL_N).forEach(([r,g,b], i) => { const v = rgbToBgr565(r,g,b); out[PAL_AT + 2*i] = v >> 8; out[PAL_AT + 2*i + 1] = v & 255; });
-  for (let i = 0; i < 8192; i++) out[PIX_AT + i] = (idx[2*i] << 4) | idx[2*i + 1];
+  for (let i = 0; i < 8192; i++) out[PIX_AT + i] = (idx[2*i] & 15) | ((idx[2*i + 1] & 15) << 4);   // low nibble = left pixel
   const c = itemChecksum(out); out[out.length-2] = c >> 8; out[out.length-1] = c & 255;
   return out;
 }
 
-// ---------- generic item frames (food, toys, wallpapers) ----------
-// 0x200: u16 frame count; each frame: u16 size, then w, h, colors, 3 bytes, palette (u16 BE BGR565), 4-bit pixels.
-function itemFrames(item) {
-  let o = 0x200; const n = (item[o] << 8) | item[o+1]; o += 2; const out = [];
-  for (let f = 0; f < n && o + 2 < item.length; f++) {
-    const size = (item[o] << 8) | item[o+1], b = o + 2;
-    const w = item[b], h = item[b+1], nc = item[b+2];
-    const pal = []; for (let i = 0; i < nc; i++) pal.push(bgr565ToRgb((item[b+6+2*i] << 8) | item[b+7+2*i]));
-    const img = new ImageData(w, h), pix = b + 6 + 2*nc;
-    for (let i = 0; i < w*h; i++) {
-      const byte = item[pix + (i >> 1)], k = (i & 1) ? byte & 15 : byte >> 4;
-      if (k === 0) continue;                                  // slot 0 is see-through
-      const c = pal[k] || [0,0,0]; img.data.set([c[0], c[1], c[2], 255], i*4);
-    }
-    out.push(img); o += 2 + size;
-  }
-  return out;
-}
-const presetBytes = {};
-for (const [k, b64] of Object.entries(PRESETS)) presetBytes[k] = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-function animate() {
-  document.querySelectorAll("canvas[data-anim]").forEach(cv => {
-    const frames = itemFrames(presetBytes[cv.dataset.anim]).map(img => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; c.getContext("2d").putImageData(img, 0, 0); return c; });
-    const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; let i = 0;
-    const draw = () => {
-      const f = frames[i % frames.length]; ctx.clearRect(0, 0, cv.width, cv.height);
-      const s = Math.max(1, Math.floor(Math.min(cv.width / f.width, cv.height / f.height)));
-      ctx.drawImage(f, (cv.width - f.width*s) / 2, (cv.height - f.height*s) / 2, f.width*s, f.height*s); i++;
-    };
-    draw();
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(draw, 600);
-  });
-}
-
-// ---------- item selection ----------
-const builtin = Uint8Array.from(atob(BG50001_B64), c => c.charCodeAt(0));
+// ---------- Custom tab ----------
+const builtin = b64(BG50001_B64);
+const presetBytes = {}; for (const [k, s] of Object.entries(PRESETS)) presetBytes[k] = b64(s);
 let fileItem = null, photoItem = null, photoBitmap = null;
-try { const saved = parseInt(localStorage.getItem("tamaos_next_id"), 10); if (saved >= 50012 && saved <= 65535) document.getElementById("wpId").value = saved; } catch {}
+{ const saved = parseInt(store.get("tamaos_next_id"), 10); if (saved >= 50012 && saved <= 65535) $("wpId").value = saved; }
 function photoIdNum() { return Math.max(50012, Math.min(65535, parseInt($("wpId").value, 10) || 51001)); }
 function selectedSrc() { const r = document.querySelector('input[name="src"]:checked'); return r ? r.value : "builtin"; }
-function currentItem() {
+function customItem() {
   const v = selectedSrc();
   if (v.startsWith("preset:")) return presetBytes[v.slice(7)];
   return v === "file" ? fileItem : v === "photo" ? photoItem : builtin;
 }
-function refreshItem() {
+function refreshCustom() {
   $("photoOpts").hidden = !$("srcPhoto").checked;
-  const item = currentItem();
-  if (!item) { $("lcdItem").textContent = $("srcPhoto").checked ? "no photo" : "no file"; $("itemInfo").hidden = true; $("previewBox").hidden = !$("srcPhoto").checked; return; }
+  const item = customItem();
+  if (!item) { $("itemInfo").hidden = true; $("previewBox").hidden = !$("srcPhoto").checked; refreshLcdItem(); return; }
   const info = itemInfo(item);
-  $("lcdItem").textContent = info ? info.id : "?";
   if ($("srcFile").checked) show($("itemInfo"), info ? `${info.name} · ${info.id} · ${item.length.toLocaleString()} bytes` : "", "ok");
   else $("itemInfo").hidden = true;
   if (isWallpaper(item)) drawPreview(decodeWallpaper(item), $("srcPhoto").checked ? "Preview of what the Tama will show (15 colors)" : `${info ? info.id : "Wallpaper"} as stored in the file`);
   else $("previewBox").hidden = true;
+  refreshLcdItem();
 }
 function rebuildPhoto() {
-  if (!photoBitmap) { photoItem = null; refreshItem(); return; }
+  if (!photoBitmap) { photoItem = null; refreshCustom(); return; }
   const cv = document.createElement("canvas"); cv.width = cv.height = 128;
-  const ctx = cv.getContext("2d");
-  const s = Math.min(photoBitmap.width, photoBitmap.height);
+  const ctx = cv.getContext("2d"), s = Math.min(photoBitmap.width, photoBitmap.height);
   ctx.drawImage(photoBitmap, (photoBitmap.width - s) / 2, (photoBitmap.height - s) / 2, s, s, 0, 0, 128, 128);
   const { pal, idx } = quantize(ctx.getImageData(0, 0, 128, 128).data, PAL_N, $("dither").checked);
   photoItem = buildWallpaper(builtin, pal, idx, $("wpName").value || "TamaOS photo", photoIdNum());
   log(`Photo converted: tg19_bg${photoIdNum()}, ${pal.length} colors`);
-  refreshItem();
+  refreshCustom();
 }
 $("photoIn").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
@@ -436,36 +626,99 @@ $("photoIn").addEventListener("change", e => {
   img.onerror = () => show($("itemInfo"), "That picture couldn't be opened. Try a JPG or PNG.", "bad");
   img.src = URL.createObjectURL(f);
 });
-$("dither").addEventListener("change", rebuildPhoto);
-$("wpName").addEventListener("change", rebuildPhoto);
-$("wpId").addEventListener("change", rebuildPhoto);
-$("srcPhoto").addEventListener("change", refreshItem);
-document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("change", refreshItem));
-animate();
+["dither", "wpName", "wpId"].forEach(id => $(id).addEventListener("change", rebuildPhoto));
+document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("change", refreshCustom));
 $("fileIn").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
   const buf = new Uint8Array(await f.arrayBuffer());
   $("srcFile").checked = true;
-  if (!itemInfo(buf)) { fileItem = null; show($("itemInfo"), `${f.name} isn't a Tamagotchi item (no TAMAGO header). Use a MyMeets item .txt file.`, "bad"); $("lcdItem").textContent = "bad file"; return; }
-  fileItem = buf; refreshItem();
+  if (!itemInfo(buf)) { fileItem = null; show($("itemInfo"), `${f.name} isn't a Tamagotchi item (no TAMAGO header). Use a MyMeets item .txt file.`, "bad"); refreshLcdItem(); return; }
+  fileItem = buf; refreshCustom();
 });
-$("srcBuiltin").addEventListener("change", refreshItem);
-$("srcFile").addEventListener("change", refreshItem);
-refreshItem();
+document.querySelectorAll("canvas[data-anim]").forEach(cv => animate(cv, itemFrames(presetBytes[cv.dataset.anim])));
+
+// ---------- Shop tab (MyMeets catalogue) ----------
+const TYPE_NAMES = { 1: "Wallpapers", 2: "Food", 3: "Items", 4: "Accessories", 6: "Games", 5: "Stations" };
+const cat = { index: null, blobs: {}, lang: store.get("tamaos_cat_lang") || "en", type: 1, selected: null, loading: null };
+$("catLang").value = cat.lang;
+function loadCatalog() {
+  if (cat.loading) return cat.loading;
+  cat.loading = (async () => {
+    try {
+      const r = await fetch(DATA + "items.json"); if (!r.ok) throw new Error(`items.json: HTTP ${r.status}`);
+      cat.index = await r.json(); await showCatalog();
+    } catch (e) { cat.loading = null; $("catStatus").textContent = `The catalogue couldn't load (${describe(e)}). Check that the data folder was uploaded next to this page.`; }
+  })();
+  return cat.loading;
+}
+async function catBlob(lang) {
+  if (!cat.blobs[lang]) cat.blobs[lang] = fetch(DATA + `items_${lang}.bin`).then(r => { if (!r.ok) throw new Error(`items_${lang}.bin: HTTP ${r.status}`); return r.arrayBuffer(); }).then(b => new Uint8Array(b));
+  return cat.blobs[lang];
+}
+function catItemBytes(row, blob) { return blob.subarray(row[0], row[0] + row[1]).slice(); }
+async function showCatalog() {
+  if (!cat.index) return;
+  const rows = cat.index[cat.lang];
+  const types = Object.keys(TYPE_NAMES).map(Number).filter(t => rows.some(r => r[2] === t));
+  if (!types.includes(cat.type)) cat.type = types[0];
+  $("catTypes").replaceChildren(...types.sort((a, b) => [1,2,3,4,6,5].indexOf(a) - [1,2,3,4,6,5].indexOf(b)).map(t => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = `${TYPE_NAMES[t]} ${rows.filter(r => r[2] === t).length}`;
+    b.setAttribute("aria-pressed", t === cat.type); b.onclick = () => { cat.type = t; showCatalog(); }; return b;
+  }));
+  $("catStatus").textContent = "Loading pictures…";
+  let blob;
+  try { blob = await catBlob(cat.lang); } catch (e) { $("catStatus").textContent = `Couldn't load the items (${describe(e)}).`; return; }
+  const q = $("catSearch").value.trim().toLowerCase();
+  const list = rows.filter(r => r[2] === cat.type && (!q || r[4].toLowerCase().includes(q) || String(r[3]).includes(q) || r[6].toLowerCase().includes(q)));
+  const frag = document.createDocumentFragment();
+  for (const r of list) {
+    const lab = document.createElement("label"); lab.className = "card";
+    const inp = document.createElement("input"); inp.type = "radio"; inp.name = "cat"; inp.value = r[6];
+    inp.checked = cat.selected && cat.selected.row === r;
+    const cv = document.createElement("canvas"); cv.width = 72; cv.height = 72;
+    const frames = itemFrames(catItemBytes(r, blob)); drawFit(cv, frames[0] ? frameToCanvas(frames[0]) : null, true);
+    if (!frames.length) { const c = cv.getContext("2d"); c.fillStyle = getComputedStyle(document.body).getPropertyValue("--lcd-ink"); c.font = "28px sans-serif"; c.textAlign = "center"; c.fillText("★", 36, 46); }
+    const nm = document.createElement("b"); nm.textContent = r[4] || r[6];
+    const pr = document.createElement("small"); pr.textContent = r[5] ? `${r[5].toLocaleString()} GP` : "FREE";
+    lab.append(inp, cv, nm, pr);
+    inp.addEventListener("change", () => pickCatalog(r, blob));
+    frag.append(lab);
+  }
+  $("catGrid").replaceChildren(frag);
+  $("catStatus").textContent = list.length ? `${list.length} ${TYPE_NAMES[cat.type].toLowerCase()} from MyMeets. Tap one to pick it.` : "Nothing matches that search.";
+}
+function pickCatalog(row, blob) {
+  const bytes = catItemBytes(row, blob);
+  cat.selected = { row, bytes };
+  $("catPick").hidden = false; $("catName").textContent = row[4] || row[6];
+  $("catMeta").textContent = `${TYPE_NAMES[row[2]]} · ${row[6]} · number ${row[3]} · ${row[5] ? row[5].toLocaleString() + " GP" : "free"} · ${bytes.length.toLocaleString()} bytes`;
+  animate($("catCanvas"), itemFrames(bytes));
+  refreshLcdItem();
+}
+$("catLang").addEventListener("change", () => { cat.lang = $("catLang").value; store.set("tamaos_cat_lang", cat.lang); showCatalog(); });
+let searchTimer; $("catSearch").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(showCatalog, 250); });
+
+function currentItem() {
+  if (activeTab() === "shop") return cat.selected ? cat.selected.bytes : null;
+  return customItem();
+}
+function refreshLcdItem() {
+  const t = activeTab();
+  if (t === "marry") { $("lcdItem").textContent = "marriage"; return; }
+  const item = currentItem(), info = item && itemInfo(item);
+  $("lcdItem").textContent = info ? info.id : t === "shop" ? "pick an item" : $("srcPhoto").checked ? "no photo" : "no file";
+}
 
 // ---------- Bluetooth link ----------
 class Link {
   constructor(tx, rx) { this.tx = tx; this.rx = rx; this.q = []; this.waiters = []; }
   async start() {
     this.rx.addEventListener("characteristicvaluechanged", e => {
-      const dv = e.target.value;
-      const v = new Uint8Array(dv.byteLength); for (let i = 0; i < dv.byteLength; i++) v[i] = dv.getUint8(i);
+      const dv = e.target.value, v = new Uint8Array(dv.byteLength); for (let i = 0; i < dv.byteLength; i++) v[i] = dv.getUint8(i);
       log("RX " + hex(v));
       const w = this.waiters.shift(); if (w) w(v); else this.q.push(v);
     });
-    log("step: start notifications");
-    await this.rx.startNotifications();
-    await sleep(300);
+    log("step: start notifications"); await this.rx.startNotifications(); await sleep(300);
   }
   next(ms) {
     if (this.q.length) return Promise.resolve(this.q.shift());
@@ -476,10 +729,7 @@ class Link {
     });
   }
   async w(data) {
-    if (this.mode === undefined) {
-      this.mode = this.tx.writeValueWithoutResponse ? "noresp" : "plain";
-      log(`write mode: ${this.mode}`);
-    }
+    if (this.mode === undefined) { this.mode = this.tx.writeValueWithoutResponse ? "noresp" : "plain"; log(`write mode: ${this.mode}`); }
     if (this.mode === "noresp") {
       try { await this.tx.writeValueWithoutResponse(data); return; }
       catch (e) { log(`writeValueWithoutResponse failed (${describe(e)}), switching to writeValue`); this.mode = "plain"; }
@@ -490,12 +740,10 @@ class Link {
     this.q.length = 0;
     log(`TX start ${label} (${msg.length} bytes)`);
     await this.w(START); await sleep(50);
-    const n = Math.ceil(msg.length / 20);
-    let deadline = performance.now();
+    const n = Math.ceil(msg.length / 20); let deadline = performance.now();
     for (let i = 0; i < n; i++) {
       await this.w(msg.slice(i*20, (i+1)*20));
-      deadline += pace;
-      const wait = deadline - performance.now(); if (wait > 0) await sleep(wait);
+      deadline += pace; const wait = deadline - performance.now(); if (wait > 0) await sleep(wait);
       if (onPct) onPct((i+1) / n * 100);
     }
     await this.w(END);
@@ -517,33 +765,15 @@ class Link {
     return Uint8Array.from(data);
   }
 }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const BT_MISSING = "This browser can't use Bluetooth here. On iPhone, open this page in the Bluefy app. On Android, open it in Chrome. Copy the link and paste it into that browser, then try again.";
+if (!navigator.bluetooth) show($("support"), BT_MISSING, "warn");
 
-// ---------- main flow ----------
-if (!navigator.bluetooth) {
-  show($("support"), "This browser can't use Bluetooth here. On iPhone, open this page in the Bluefy app. On Android, open it in Chrome. Copy the link and paste it into that browser, then try again.", "warn");
-}
-$("goBtn").addEventListener("click", async () => {
-  let item = currentItem();
-  const result = $("result"); result.hidden = true;
-  if (!item) { show(result, "Choose an item file first.", "bad"); return; }
-  if ($("setPrice").checked) {
-    if (isWallpaper(item)) {
-      const price = Math.max(0, Math.min(65535, parseInt($("price").value, 10) || 0));
-      item = withPrice(item, price);
-      log(`Shop price set to ${price} (was ${(currentItem()[0x76] << 8) | currentItem()[0x77]})`);
-    } else log("Not a 128x128 wallpaper, price left unchanged");
-  }
-  const points = Math.max(0, Math.min(MAX_POINTS, parseInt($("pts").value, 10) || 0));
-  $("pts").value = points; $("lcdPts").textContent = `+${points} PTS`;
-  const pace = Math.max(10, Math.min(200, parseInt($("delay").value, 10) || 40));
-  if (!navigator.bluetooth) { show(result, "Bluetooth isn't available in this view. Open the page in Bluefy (iPhone) or Chrome (Android).", "bad"); return; }
-
-  $("goBtn").disabled = true; progress(0);
+// Connects, runs `work(link)`, always disconnects. Shared by every send button.
+async function withTama(work) {
+  if (!navigator.bluetooth) throw Object.assign(new Error(BT_MISSING), { friendly: true });
   let device;
   try {
-    lcd("SEARCH", "Pick TMGC_meets");
-    log("step: choose device");
+    lcd("SEARCH", "Pick TMGC_meets"); log("step: choose device");
     try {
       device = await navigator.bluetooth.requestDevice({ filters: [{ name: "TMGC_meets" }, { namePrefix: "TMGC" }], optionalServices: [SVC] });
     } catch (e) {
@@ -552,54 +782,378 @@ $("goBtn").addEventListener("click", async () => {
       device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [SVC] });
     }
     log(`picked: ${device.name || "(no name)"} ${device.id || ""}`);
-    lcd("LINK", "Connecting...");
-    log("step: connect");
+    lcd("LINK", "Connecting..."); log("step: connect");
     const server = await device.gatt.connect();
-    log("step: find service fff0");
-    const svc = await server.getPrimaryService(SVC);
+    log("step: find service fff0"); const svc = await server.getPrimaryService(SVC);
     log("step: find characteristics fff2 / fff1");
     const link = new Link(await svc.getCharacteristic(WRITE), await svc.getCharacteristic(NOTIFY));
     await link.start();
+    return await work(link);
+  } finally {
+    try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
+  }
+}
+function friendlyError(e) {
+  if (e && e.friendly) return e.message;
+  if (e && e.name === "NotFoundError") return "No Tamagotchi picked. Get the Tama to its waiting screen first, then tap the button again.";
+  if (e && e.name === "SecurityError") return "Bluetooth is blocked in this viewer. Open this page directly in Bluefy (iPhone) or Chrome (Android) and try again.";
+  return `Stopped at the last "step" in the log. Details: ${describe(e)}`;
+}
+// hello (op) -> reply -> message -> reply. Returns both replies.
+async function exchange(link, op, msg, label, pace, onPct) {
+  lcd("HELLO", "Saying hello...");
+  await link.send(helloMsg(op), "hello", pace);
+  const first = await link.reply(); log(`hello answered with command ${replyCommand(first)}`);
+  lcd("SEND", `Sending ${label}...`);
+  await link.send(msg, label, pace, onPct);
+  lcd("WAIT", "Tama is saving...");
+  const second = await link.reply(); log(`${label} answered with command ${replyCommand(second)} (${second.length} bytes)`);
+  return { first, second };
+}
 
-    lcd("HELLO", "Saying hello...");
-    await link.send(helloMsg(), "hello", pace);
-    log(`hello answered with command ${replyCommand(await link.reply())}`);
-
-    lcd("SEND", "Sending item...");
-    await link.send(itemMsg(item, points), "item", pace, progress);
-    lcd("WAIT", "Tama is saving...");
-    const ack = replyCommand(await link.reply());
-    log(`item answered with command ${ack}${ack === CMD_ITEM + 1 ? " (accepted)" : ""}`);
-    progress(100);
-    lcd("DONE", "Sent! Check your Tama");
-    if ($("srcPhoto").checked) {
+// ---------- send an item (Shop and Custom) ----------
+$("goBtn").addEventListener("click", async () => {
+  let item = currentItem();
+  const result = $("result"); result.hidden = true;
+  if (!item) { show(result, activeTab() === "shop" ? "Pick an item from the catalogue first." : "Choose an item first.", "bad"); return; }
+  if ($("setPrice").checked) {
+    const price = Math.max(0, Math.min(65535, parseInt($("price").value, 10) || 0));
+    log(`Shop price set to ${price} (was ${(item[0x76] << 8) | item[0x77]})`);
+    item = withPrice(item, price);
+  }
+  const points = Math.max(0, Math.min(MAX_POINTS, parseInt($("pts").value, 10) || 0));
+  $("pts").value = points; $("lcdPts").textContent = `+${points} PTS`;
+  const pace = Math.max(10, Math.min(200, parseInt($("delay").value, 10) || 40));
+  $("goBtn").disabled = true; progress(0);
+  try {
+    const { second } = await withTama(link => exchange(link, OP.item, itemMsg(item, points), "item", pace, progress));
+    const ack = replyCommand(second);
+    log(`item ${ack === CMD.item + 1 ? "accepted" : "answer " + ack}`);
+    progress(100); lcd("DONE", "Sent! Check your Tama");
+    if (activeTab() === "custom" && $("srcPhoto").checked) {
       const next = Math.min(65535, photoIdNum() + 1);
-      $("wpId").value = next; try { localStorage.setItem("tamaos_next_id", String(next)); } catch {}
-      log(`Next photo will use number ${next}`);
-      rebuildPhoto();
+      $("wpId").value = next; store.set("tamaos_next_id", String(next)); log(`Next photo will use number ${next}`); rebuildPhoto();
     }
     show(result, `Sent. Check your Tamagotchi.${points ? ` ${points.toLocaleString()} Gotchi Points were included.` : ""}`, "ok");
     log("Done");
   } catch (e) {
-    const msg = e && e.name === "NotFoundError" ? "No Tamagotchi picked. Do the APP → Download trick, then tap Connect & send while it's waiting."
-      : e && e.name === "SecurityError" ? "Bluetooth is blocked in this viewer. Open this page directly in Bluefy (iPhone) or Chrome (Android) and try again."
-      : `Stopped at the last "step" in the log. Details: ${describe(e)}`;
-    lcd("ERROR", "Transfer failed");
-    show(result, msg, "bad");
-    log("Error: " + describe(e));
-  } finally {
-    try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
-    $("goBtn").disabled = false;
-  }
+    lcd("ERROR", "Transfer failed"); show(result, friendlyError(e), "bad"); log("Error: " + describe(e));
+  } finally { $("goBtn").disabled = false; }
 });
+
+// ---------- Marry tab (MyMeets marriage) ----------
+// Character assets: parts B (body), M (face), A (head), K (back). Each has Offset, Tbl and Char files.
+const PART_NAMES = { B: "body", M: "face", A: "head", K: "back" };
+const IMG_COUNT = { B: 14, A: 11, M: 19, K: 7 };
+const SMALL_IDX = { B: 9, A: 7, M: 15, K: 6 };
+// 13 colour sets of 8; the last is the grey template the art is drawn in (from MyMeets' CharacterImage).
+const PALETTES = [[[255,255,209],[255,255,109],[224,224,0],[255,255,99],[255,219,0],[255,191,0],[244,234,76],[214,204,0]],[[255,142,153],[255,119,130],[242,58,73],[255,89,102],[229,0,17],[183,0,15],[135,0,0],[104,0,0]],[[155,204,255],[107,165,232],[73,130,193],[73,96,255],[63,84,224],[25,45,186],[0,20,160],[0,17,132]],[[198,198,198],[160,160,160],[132,132,132],[119,119,119],[102,102,102],[79,79,79],[73,56,56],[33,33,33]],[[255,255,255],[255,255,255],[244,242,242],[255,255,255],[242,239,239],[219,216,216],[211,209,209],[219,214,191]],[[255,255,255],[255,219,239],[244,186,209],[249,193,219],[255,170,204],[239,124,175],[255,130,165],[224,84,119]],[[255,234,127],[255,186,0],[255,135,0],[255,193,0],[255,145,0],[229,112,0],[158,91,0],[127,73,0]],[[255,255,237],[255,249,198],[242,234,135],[255,255,229],[255,249,186],[221,211,89],[252,247,201],[249,242,114]],[[175,244,68],[140,209,35],[99,170,0],[122,170,79],[102,142,68],[40,112,25],[84,142,0],[66,114,0]],[[242,249,255],[206,234,249],[153,198,226],[214,244,255],[130,209,255],[94,175,214],[107,158,211],[61,114,173]],[[255,234,255],[229,191,214],[198,145,186],[229,165,214],[191,104,165],[147,68,124],[209,68,170],[191,51,140]],[[255,255,249],[224,224,224],[175,170,173],[255,255,255],[211,211,211],[188,188,188],[237,237,237],[214,214,214]],[[239,239,219],[216,216,196],[170,170,150],[142,142,124],[117,117,96],[73,73,53],[53,53,33],[30,30,10]]];
+// DNA patterns for "Marry character" (MyMeets' CharacterDNA.DNA_PATTERNS, 4 groups of 4).
+const DNA_PATTERNS = [[[0,1,10,11,8,9,2,3],[8,9,2,3,0,1,10,11],[0,9,10,3,8,1,2,11],[8,1,2,11,0,9,10,3]],[[0,1,10,11,12,9,6,3],[8,9,2,3,4,1,14,11],[0,9,10,3,12,1,6,11],[8,1,2,11,4,9,14,3]],[[0,1,10,11,12,1,2,11],[8,1,2,11,4,9,10,3],[0,1,10,11,12,9,2,3],[8,9,2,3,4,1,10,11]],[[0,9,10,3,8,1,6,11],[8,1,2,11,0,9,14,3],[0,1,10,11,8,9,6,3],[8,9,2,3,0,1,14,11]]];
+const OFFSET_TABLE = [0x00,0x01,0x00,0x00,0xe4,0x01,0x00,0x00,0xe8,0x01,0x00,0x00,0xf4,0x01,0x00,0x00];
+const OFFSET_VALUES = [[0x10, 0x100, 0x400], [0x48, 0x1e4, 0x3850], [0x94, 0x1e8, 0x5300], [0xc0, 0x1f4, 0x7200]];
+const ch = { meta: null, blob: null, parts: new Map(), loading: null, sel: null, part: "B" };
+
+function charFile(e) { return e ? ch.blob.subarray(e[0], e[0] + e[1]) : null; }
+function charPart(id, p) {               // TamagoCharacter.LoadCharacterPart
+  const key = id + p; if (ch.parts.has(key)) return ch.parts.get(key);
+  const e = ch.meta.chars[id] && ch.meta.chars[id][p]; let part = null;
+  if (e && e.o && e.c && (p === "B" ? (e.t || e.te) : e.t)) {
+    const c = charFile(e.c), images = [];
+    for (let o = 0; o + 6 <= c.length; ) {
+      const size = frameSize(c, o); if (!size || o + size > c.length) break;
+      const img = decodeFrame(c, o); if (!img) break;
+      keyOut(img);
+      if (isEmpty(img) && p !== "K" && p !== "A") break;
+      images.push(img); o += size + size % 4;
+    }
+    part = { id, p, images, front: p === "K" && charFile(e.t)[6] !== 0, e };
+  }
+  ch.parts.set(key, part); return part;
+}
+function isEmpty(img) { const p = img.px; for (let i = 4; i < p.length; i++) if (p[i] !== p[i & 3]) return false; return true; }
+function partImage(id, p, idx) {         // CharacterManager.GetCharacterImage (returns a copy)
+  const part = charPart(id, p);
+  if (!part || idx >= part.images.length || part.images.length !== IMG_COUNT[p]) return null;
+  const im = part.images[idx]; return { w: im.w, h: im.h, px: im.px.slice() };
+}
+function partOffsets(b) {                // CharacterImage.GetPartOffsets: red/yellow/blue marker pixels in the body
+  const offs = { A: [0, 0], M: [0, 0], K: [0, 0] }, p = b.px, at = (x, y) => (y * b.w + x) * 4;
+  const c = [0, 1, 2, 3].map(x => p.slice(at(x, 0), at(x, 0) + 4));
+  for (let x = 0; x < 4; x++) p.set(c[0], at(x, 0));
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+    const i = at(x, y), r = p[i], g = p[i+1], bl = p[i+2], a = p[i+3];
+    if (a !== 255) continue;
+    if (r === 255 && g === 0 && bl === 0) { offs.A = [x, y]; p.set(c[1], i); }
+    else if (r === 255 && g === 255 && bl === 0) { offs.M = [x, y]; p.set(c[2], i); }
+    else if (r === 0 && g === 0 && bl === 255) { offs.K = [x, y]; p.set(c[3], i); return offs; }
+  }
+  return offs;
+}
+function colorize(img, pi) {             // template grey -> chosen colour set
+  const out = { w: img.w, h: img.h, px: img.px.slice() }, tpl = PALETTES[PALETTES.length - 1], pal = PALETTES[pi] || tpl, p = out.px;
+  for (let i = 0; i < p.length; i += 4) for (let k = 0; k < 8; k++) {
+    const t = tpl[k], dr = t[0] - p[i], dg = t[1] - p[i+1], db = t[2] - p[i+2];
+    if (Math.sqrt(0.3*dr*dr + 0.59*dg*dg + 0.11*db*db) <= 10) { p[i] = pal[k][0]; p[i+1] = pal[k][1]; p[i+2] = pal[k][2]; p[i+3] = 255; break; }
+  }
+  return out;
+}
+// CharacterManager.ComposeCharacterImage: 64x64 (or 48x40 "small") on the see-through green.
+function composeImage(sel, small) {
+  const layers = {}, offsCopy = {}; let offs = { A: [0,0], M: [0,0], K: [0,0] }, front = false;
+  for (const p of Object.keys(sel)) {
+    const im = partImage(sel[p][0], p, small ? SMALL_IDX[p] : 0);
+    if (!im) return null;
+    if (p === "B") offs = partOffsets(im);
+    if (p === "K") { const k = charPart(sel[p][0], "K"); front = !!(k && k.front); }
+    layers[p] = colorize(im, sel[p][1]);
+  }
+  if (!["B","A","M","K"].every(p => layers[p])) return null;
+  const [w, h, x0, y0] = small ? [48, 40, 8, 4] : [64, 64, 8, 6];
+  const out = { w, h, px: new Uint8ClampedArray(w * h * 4) };
+  for (let i = 0; i < out.px.length; i += 4) { out.px[i+1] = 255; out.px[i+3] = 255; }
+  for (const p of front ? ["B","A","M","K"] : ["K","B","A","M"]) {
+    const im = layers[p]; let x = x0, y = y0;
+    if (p !== "B") { x += offs[p][0] - (im.w >> 1); y += offs[p][1] - (im.h >> 1); }
+    for (let yy = 0; yy < im.h; yy++) for (let xx = 0; xx < im.w; xx++) {
+      const s = (yy * im.w + xx) * 4, X = x + xx, Y = y + yy;
+      if (!im.px[s+3] || X < 0 || Y < 0 || X >= w || Y >= h) continue;
+      out.px.set(im.px.subarray(s, s + 4), (Y * w + X) * 4);
+    }
+  }
+  return out;
+}
+// TamagoImage.FromBitmap: palette in column order, 4-bit low nibble first, size padded MyMeets' way.
+function encodeImage(im) {
+  const key = i => (im.px[i*4] << 24 | im.px[i*4+1] << 16 | im.px[i*4+2] << 8 | im.px[i*4+3]) >>> 0;
+  const pal = [], at = new Map();
+  for (let x = 0; x < im.w; x++) for (let y = 0; y < im.h; y++) { const k = key(y * im.w + x); if (!at.has(k)) { at.set(k, pal.length); pal.push(k); } }
+  let n = im.w * im.h; if (pal.length <= 16) n >>= 1;
+  let size = 6 + n + pal.length * 2; size += size % 4;
+  const out = new Uint8Array(size);
+  out[0] = im.w; out[1] = im.h; out[2] = pal.length & 255;
+  if (pal.length <= 16) out[3] = 1; else out[4] = 1;
+  out[5] = 0xff;
+  pal.forEach((k, i) => { const v = rgbToBgr565(k >>> 24, (k >>> 16) & 255, (k >>> 8) & 255); out[6 + 2*i] = v >> 8; out[7 + 2*i] = v & 255; });
+  let o = 6 + 2 * pal.length;
+  if (pal.length <= 16) for (let i = 0; i < im.w * im.h; i += 2) out[o++] = (at.get(key(i)) & 15) | ((at.get(key(i + 1)) & 15) << 4);
+  else for (let i = 0; i < im.w * im.h; i++) out[o++] = at.get(key(i));
+  return out;
+}
+function composeCharacterData(sex, ids, lang) {   // CharacterManager.ComposeCharacterData -> 0x8000 bytes
+  const out = new Uint8Array(0x8000); out.set(OFFSET_TABLE, 0);
+  ["B","M","A","K"].forEach((p, i) => {
+    const e = ch.meta.chars[ids[p]][p];
+    const tbl = p === "B" && lang === 8 ? e.te : e.t;
+    if (!e.o || !tbl || !e.c) throw new Error(`Character ${ids[p]} has no ${PART_NAMES[p]} data${p === "B" && lang === 8 ? " in English" : ""}.`);
+    [e.o, tbl, e.c].forEach((f, j) => {
+      const pos = OFFSET_VALUES[i][j], data = charFile(f);
+      if (pos + data.length > 0x8000) throw new Error("Character data too large.");
+      out.set(data, pos);
+      if (i === 0 && j === 1) out[pos + 6] = sex & 255;
+    });
+  });
+  return out;
+}
+function dnaFromType(type) {             // CharacterDNA.GetDNAFromType(type, 0) -> { value, pattern }
+  const pattern = new Uint8Array(8);
+  if (type === 1) { pattern.fill(8); return { value: 255, pattern }; }
+  if (type === 2) { for (let i = 0; i < 8; i++) pattern[i] = rnd(0, 12); return { value: 255, pattern }; }
+  const r = rnd(0, 100), group = r < 25 ? 0 : r < 50 ? 1 : r < 75 ? 2 : 3;
+  const sub = r % 10 > 3 ? (r % 10) % 3 + 1 : 0;
+  pattern.set(DNA_PATTERNS[group][sub]); return { value: group, pattern };
+}
+function visitRecord(sex, id, dna, palette) {     // TamagoVisit + CreateCharacterInformation
+  const v = { sex, id, username: toMojis("TAMA"), rid1: 0, rid2: 0, generation: 2, growth: 4, twins: 0, birthday: 0x101,
+    unk1: 0, unk2: 0, dna: dna.value, dnaPattern: dna.pattern, palette };
+  const info = new Uint8Array(0x8c), dv = new DataView(info.buffer), nm = new Uint8Array(18);
+  nm.set(v.username.subarray(0, 18));
+  dv.setUint32(0, 1, true); dv.setUint32(4, 1, true); dv.setUint32(8, 0x80, true); dv.setUint16(12, sex, true); dv.setUint16(14, 3, true);
+  dv.setUint16(80, v.birthday, true); dv.setUint16(82, v.generation, true); info.set(nm, 84); info.set(nm, 104); dv.setUint16(122, v.twins, true);
+  v.info = info; return v;
+}
+function parentImages(a, b) {
+  const out = new Uint8Array(0x180c), dv = new DataView(out.buffer);
+  dv.setUint32(0, 8, true); dv.setUint32(4, 1, true); dv.setUint32(8, 0x1800, true);
+  out.set(a.subarray(0, 0xc00), 12); out.set(b.subarray(0, 0xc00), 12 + 0xc00); return out;
+}
+function randomPartId(p) {               // CharacterManager.GetRandomPartID
+  const ids = ch.meta.ids, id = ids[rnd(0, ids.length - 1)], part = charPart(id, p);
+  return part && part.images.length ? id : 16;
+}
+function fakeParent(sel, chance) {       // CreateFakeParent: a half-random relative drawn small
+  for (let tries = 0; tries < 50; tries++) {
+    const s = {};
+    for (const p of Object.keys(sel)) {
+      let id = randomPartId(p), pal = rnd(0, PALETTES.length - 1);
+      if (rnd(30, 100) > chance[p][0]) id = sel[p][0];
+      if (rnd(30, 100) > chance[p][1]) pal = sel[p][1];
+      s[p] = [id, pal];
+    }
+    const im = composeImage(s, true); if (im) return encodeImage(im);
+  }
+  return encodeImage(composeImage(sel, true));
+}
+function buildMarriage(visitData, opts) {         // BLEMarriageForm.TamaMarry
+  const partnerSex = (1 - visitData[0x5f]) & 255;
+  const dna = dnaFromType(opts.mode); if (partnerSex === 0) dna.pattern.fill(0);
+  const dnaVisit = dnaFromType(0);
+  const charData = composeCharacterData(opts.sex, opts.ids, opts.lang);
+  const r = Array.from({ length: 7 }, () => rnd(0, 100));
+  const info = { B: [opts.ids.B, opts.colors[0]], M: [opts.ids.M, 0], A: [opts.ids.A, opts.colors[1]], K: [opts.ids.K, opts.colors[2]] };
+  const c1 = { B: [r[0], r[4]], M: [r[2], 0], A: [r[1], r[5]], K: [r[3], r[6]] };
+  const c2 = Object.fromEntries(Object.entries(c1).map(([k, [a, b]]) => [k, [100 - a, 100 - b]]));
+  const visit = visitRecord(partnerSex, opts.ids.B, dnaVisit, Uint8Array.from(opts.colors));
+  visit.parents = parentImages(fakeParent(info, c1), fakeParent(info, c2));
+  return compilePacket(OP.marriage, CMD.marriage, 0x99a6, { mar: { visit, charData, colors: Uint8Array.from(opts.colors),
+    dnaPattern: dna.pattern, sex: opts.sex, dnaValue: dna.value, bKind: 0, pKind: 0 } });
+}
+const visitorId = r => hex(Uint8Array.of(r[114], r[115], r[120], r[121], r[138], r[139], r[142], r[143]));
+function isAdult(d) {                    // BLEMarriageForm.IsCharacterAdult
+  if (d.length < 0x600) return false;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength), a = dv.getUint32(0xcc, true), b = dv.getUint32(0xd0, true);
+  if (a + 16 > d.length || b + 16 > d.length) return false;
+  const id = dv.getUint16(a + 14, true), growth = dv.getUint16(b + 14, true);
+  const face = partImage(id, "M", 0);
+  log(`visiting Tama: character ${id}, growth ${growth}`);
+  return !!face && !isEmpty(face) && growth >= 2;
+}
+
+// ---- Marry tab UI ----
+function loadCharacters() {
+  if (ch.loading) return ch.loading;
+  ch.loading = (async () => {
+    try {
+      const [m, b] = await Promise.all([fetch(DATA + "chars.json"), fetch(DATA + "chars.bin")]);
+      if (!m.ok || !b.ok) throw new Error(`HTTP ${m.status}/${b.status}`);
+      ch.meta = await m.json(); ch.blob = new Uint8Array(await b.arrayBuffer());
+      const saved = store.get("tamaos_partner");
+      try { ch.sel = saved && JSON.parse(saved); } catch {}
+      if (!ch.sel || !["B","M","A","K"].every(p => ch.sel[p] && partImage(ch.sel[p][0], p, 0))) ch.sel = randomCharacter();
+      $("mWhole").append(...ch.meta.ids.filter(id => ["B","M","A","K"].every(p => partImage(id, p, 0))).map(id => new Option(`Character ${id}`, id)));
+      $("mStatus").textContent = `${ch.meta.ids.length} characters loaded. Pick parts and colors, or roll a random one.`;
+      renderPartner(); renderParts(); restoreVisit();
+    } catch (e) { ch.loading = null; $("mStatus").textContent = `Characters couldn't load (${describe(e)}). Check that the data folder was uploaded next to this page.`; }
+  })();
+  return ch.loading;
+}
+function randomCharacter() {             // CharacterManager.CreateRandomCharacter
+  const s = {};
+  for (const p of ["B","A","M","K"]) { let id; do { id = randomPartId(p); } while (!partImage(id, p, 0)); s[p] = [id, rnd(0, PALETTES.length - 1)]; }
+  return s;
+}
+function previewSel() { return { B: ch.sel.B, A: ch.sel.A, M: [ch.sel.M[0], 0], K: ch.sel.K }; }
+function renderPartner() {
+  store.set("tamaos_partner", JSON.stringify(ch.sel));
+  const im = composeImage(previewSel(), false), cv = $("mCanvas"), ctx = cv.getContext("2d");
+  if (!im) { ctx.clearRect(0, 0, 64, 64); return; }
+  const k = keyOut({ w: im.w, h: im.h, px: im.px.slice() });
+  ctx.clearRect(0, 0, 64, 64); ctx.putImageData(new ImageData(k.px, 64, 64), 0, 0);
+}
+function renderParts() {
+  const p = ch.part, hasColor = p !== "M";
+  $("mPartTabs").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.part === p));
+  $("mColorsBox").hidden = !hasColor;
+  $("mColorsLabel").textContent = `Color for the ${PART_NAMES[p]}`;
+  if (hasColor) $("mSwatches").replaceChildren(...PALETTES.map((pal, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "swatch";
+    b.setAttribute("aria-label", i === PALETTES.length - 1 ? "Original grey" : `Color set ${i + 1}`);
+    b.setAttribute("aria-pressed", ch.sel[p][1] === i);
+    for (const k of [0, 2, 4, 6]) { const s = document.createElement("i"); s.style.background = `rgb(${pal[k].join(",")})`; b.append(s); }
+    b.onclick = () => { ch.sel[p] = [ch.sel[p][0], i]; renderPartner(); renderParts(); };
+    return b;
+  }));
+  const frag = document.createDocumentFragment();
+  for (const id of ch.meta.ids) {
+    const im = partImage(id, p, 0); if (!im) continue;
+    if (p === "B") partOffsets(im);
+    const lab = document.createElement("label"); lab.className = "card"; lab.title = `Character ${id}`;
+    const inp = document.createElement("input"); inp.type = "radio"; inp.name = "mpart"; inp.checked = ch.sel[p][0] === id;
+    inp.setAttribute("aria-label", `${PART_NAMES[p]} from character ${id}`);
+    inp.onchange = () => { ch.sel[p] = [id, ch.sel[p][1]]; renderPartner(); };
+    const cv = document.createElement("canvas"); cv.width = im.w; cv.height = im.h;
+    cv.getContext("2d").putImageData(new ImageData(colorize(im, hasColor ? ch.sel[p][1] : 0).px, im.w, im.h), 0, 0);
+    lab.append(inp, cv); frag.append(lab);
+  }
+  $("mGrid").replaceChildren(frag);
+}
+$("mPartTabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || !ch.meta) return; ch.part = b.dataset.part; renderParts(); });
+$("mRandom").addEventListener("click", () => { if (!ch.meta) return; ch.sel = randomCharacter(); renderPartner(); renderParts(); });
+$("mRandomColors").addEventListener("click", () => { if (!ch.meta) return; for (const p of ["B","A","K"]) ch.sel[p] = [ch.sel[p][0], rnd(0, PALETTES.length - 1)]; renderPartner(); renderParts(); });
+$("mWhole").addEventListener("change", () => {
+  const id = parseInt($("mWhole").value, 10); if (!id || !ch.meta) return;
+  for (const p of ["B","M","A","K"]) ch.sel[p] = [id, PALETTES.length - 1];
+  renderPartner(); renderParts(); $("mWhole").value = "";
+});
+const MODE_HINTS = ["A normal marriage, like on the device.", "Your baby grows into this exact character.", "Random genes, not based on the device."];
+$("mMode").addEventListener("change", () => { $("mModeHint").textContent = MODE_HINTS[$("mMode").value]; });
+$("mModeHint").textContent = MODE_HINTS[0];
+
+// Visit state survives a page reload (the Tama is away until step 2).
+let visit = null;
+function restoreVisit() {
+  try { const s = JSON.parse(store.get("tamaos_visit") || "null"); if (s) visit = { data: b64(s.data), id: s.id, adult: s.adult }; } catch {}
+  updateSteps();
+}
+function updateSteps() {
+  $("mStep1").classList.toggle("done", !!visit);
+  $("mBadge1").textContent = visit ? `STEP 1 · VISIT · DONE${visit.adult ? "" : " (NOT AN ADULT)"}` : "STEP 1 · VISIT";
+  $("mMarryBtn").disabled = !visit || !visit.adult; $("mBackBtn").disabled = !visit;
+}
+const pace = () => Math.max(10, Math.min(200, parseInt($("mDelay").value, 10) || 40));
+async function marryAction(btn, fn) {
+  const res = $("mResult"); res.hidden = true;
+  document.querySelectorAll("#panel-marry .go, #panel-marry .alt").forEach(b => b.disabled = true);
+  progress(0);
+  try { await fn(res); }
+  catch (e) { lcd("ERROR", "Transfer failed"); show(res, friendlyError(e), "bad"); log("Error: " + describe(e)); }
+  finally { document.querySelectorAll("#panel-marry .alt").forEach(b => b.disabled = false); $("mVisitBtn").disabled = false; updateSteps(); }
+}
+$("mVisitBtn").addEventListener("click", () => marryAction($("mVisitBtn"), async res => {
+  await loadCharacters(); if (!ch.meta) throw Object.assign(new Error("The characters haven't loaded yet."), { friendly: true });
+  const { first, second } = await withTama(link => exchange(link, OP.visit, compilePacket(OP.visit, CMD.visit, 0x102), "visit", pace(), progress));
+  const adult = isAdult(second);
+  visit = { data: second, id: visitorId(first), adult };
+  store.set("tamaos_visit", JSON.stringify({ data: toB64(second), id: visit.id, adult }));
+  progress(100); lcd("VISIT", adult ? "Your Tama is visiting!" : "Not an adult yet");
+  show(res, adult ? "Your Tama is visiting. Press any button on it, then follow step 2."
+                  : "Your Tama is visiting, but it isn't an adult yet, so it can't marry. Follow step 2 and tap \"Just bring my Tama back\".", adult ? "ok" : "warn");
+}));
+$("mBackBtn").addEventListener("click", () => marryAction($("mBackBtn"), async res => {
+  await withTama(link => exchange(link, OP.back, compilePacket(OP.back, CMD.back, 0x102), "back", pace(), progress));
+  visit = null; store.set("tamaos_visit", null);
+  progress(100); lcd("DONE", "Your Tama is home"); show(res, "Your Tama should be back home.", "ok");
+}));
+$("mMarryBtn").addEventListener("click", () => marryAction($("mMarryBtn"), async res => {
+  await loadCharacters();
+  const s = $("mSex").value, opts = {
+    mode: parseInt($("mMode").value, 10), sex: s === "r" ? rnd(0, 2) : parseInt(s, 10), lang: parseInt($("mLang").value, 10),
+    ids: { B: ch.sel.B[0], M: ch.sel.M[0], A: ch.sel.A[0], K: ch.sel.K[0] }, colors: [ch.sel.B[1], ch.sel.A[1], ch.sel.K[1]],
+  };
+  const msg = buildMarriage(visit.data, opts);
+  log(`marriage file built: ${msg.length} bytes, mode ${opts.mode}, sex ${opts.sex}, parts ${JSON.stringify(opts.ids)}, colors ${opts.colors}`);
+  await withTama(async link => {
+    lcd("HELLO", "Saying hello...");
+    await link.send(helloMsg(OP.marriage), "hello", pace());
+    const first = await link.reply();
+    if (visitorId(first) !== visit.id) log("warning: this doesn't look like the Tama that visited (MyMeets carries on anyway)");
+    lcd("SEND", "Sending marriage...");
+    await link.send(msg, "marriage", pace(), progress);
+    lcd("WAIT", "Tama is saving...");
+    const second = await link.reply(); log(`marriage answered with command ${replyCommand(second)}`);
+  });
+  visit = null; store.set("tamaos_visit", null);
+  progress(100); lcd("DONE", "Married!"); show(res, "Married! Check your Tamagotchi.", "ok");
+}));
 
 $("copyBtn").addEventListener("click", async () => {
   const text = logLines.join("\n") || "(empty)";
   try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy log", 1500); }
   catch { const r = document.createRange(); r.selectNodeContents($("logBox")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 });
-log("Ready. Built-in item: tg19_bg50001");
+refreshCustom();
+selectTab(tabs.includes(store.get("tamaos_tab")) ? store.get("tamaos_tab") : "shop");
+log("Ready.");
 </script>
-
 </body>
 </html>

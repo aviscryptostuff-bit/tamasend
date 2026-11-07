@@ -8,16 +8,29 @@ TamaOS sends custom content to a Tamagotchi On / Meets over Bluetooth Low Energy
 - **Sending works from both phone and PC.** The iPhone sends through the Bluefy browser. A Windows PC sends with the Python script.
 - **Gotchi Points (coins) are understood.** They are verified byte-for-byte against the MyMeets app's code and its Bluetooth capture. They are **not yet confirmed on the device** with the new page.
 
+**Added later on 2026-11-07 (not yet tried on the device):**
+
+- The site now has every MyMeets feature: the full **Catalogue** (Shop tab) and **Marriage** (Marry tab, with Visit and Back).
+- **Pixel order was wrong.** 4-bit pixels are **low nibble first**, not high (see §5). The photo encoder and our four presets have been fixed.
+
 ## Repo layout
 
 | Path | What it is |
 |---|---|
-| `index.html` | The TamaOS Sender page: one self-contained file, served by GitHub Pages |
+| `index.html` | The site (Shop, Custom and Marry tabs), served by GitHub Pages. It is **built** from `tools/page.html`. |
+| `data/` | The MyMeets catalogue and character assets used by the Shop and Marry tabs (about 6.7 MB). They must be uploaded next to `index.html`. |
 | `pc/tamaos_send.py` | PC sender (needs `pip install bleak`). This is the fixed version, with points at 0xbb/0xbc. |
-| `items/*.txt` | The custom items and the starter wallpaper, pulled out of `index.html` as files |
+| `items/*.txt` | The custom items and the starter wallpaper |
+| `tools/page.html` | Source of the site. Run `python tools/build_page.py` after editing it. |
+| `tools/mymeets_ref.py` | A Python port of MyMeets 2.3.7 (item parsing, images, characters, every packet type), written from its IL. The site's JavaScript is checked against it. |
+| `tools/make_data.py` | Rebuilds `data/` from a MyMeets `assets` folder |
+| `tools/fix_nibbles.py` | Swaps the pixel nibbles in an item file and fixes its checksum |
+| `tools/palettes.json`, `tools/dna.json` | Character color sets and DNA patterns copied out of MyMeets.exe |
 | `HANDOFF.md` | This file |
 
 `pc/tamaos_send.py` was rebuilt from this spec. It is checked to build the exact same bytes as `index.html` (the hello, plus each of the 5 items at 0, 50, 1,000 and 99,999 points). It has not yet been run against the device.
+
+**About `data/`:** these are Bandai's item and character files, as shipped inside MyMeets. Putting them in a public repo makes them public. That's the owner's call.
 
 ---
 
@@ -97,6 +110,42 @@ Multi-byte numbers here are **little-endian**. The layout comes from MyMeets' ow
 - **Big past mistake:** we once thought 0x5e held the points, and that "58 points works". 58 is actually `0x3a`, the send-item command. Putting 0 or 1 there makes an invalid command, and that was the cause of the "fails at 100%" bug. The real points field is at 0xbb/0xbc.
 - The Tama's reply has `TAMAGO` and the command + 1 at 0x5e. It does **not** contain the Tama's point total.
 
+### All message types (from MyMeets' `BLETmgcPacket`)
+
+Byte 0x4c is the **operand** and 0x5e is the **command**. Every exchange is: hello (`operand`, command 0x00), the Tama's reply, the real message, the Tama's reply.
+
+| Feature | Operand | Command | Size |
+|---|---|---|---|
+| Send item | 0x17 | 0x3a | 0x100 + item part + 2 |
+| Visit (Tama goes to the app) | 0x14 | 0x34 | 0x102, no data |
+| Back (bring the Tama home) | 0x15 | 0x36 | 0x102, no data |
+| Marriage | 0x16 | 0x38 | 0x99a6 (39,334) |
+
+**Marriage message.** It uses the same header, plus:
+
+- 0x42: 3 color-set numbers, for body, head and back.
+- 0x5f–0xba: a partner record (sex, name "TAMA" in mojis, body ID, generation 2, growth 4, birthday 0x101, DNA patterns).
+- 0xcc / 0xd0 / 0xec: offsets of three attached sections (0x100, 0x810c, 0x8198).
+
+It has three sections, each with a header of `u32 kind, u32 1, u32 size`:
+
+1. A 32 KB character block. It holds each part's Offset, Tbl and Char files at fixed places. The partner's sex goes at body Tbl + 6.
+2. 0x80 bytes of character info.
+3. Two 48×40 "parent" pictures, 0xc00 each.
+
+`tools/mymeets_ref.py` has the full layout.
+
+**Marriage flow (MyMeets):**
+
+1. **Visit.** On the Tama: Connection → App → Visit (あそびにいく). Send the Visit messages. The second reply is the visiting Tama's data:
+   - 0x5f is its sex.
+   - The u32 at 0xcc points to a section where +14 is its character ID.
+   - The u32 at 0xd0 points to a section where +14 is its growth stage. 2 or more means adult.
+   - Bytes 114–115, 120–121, 138–139 and 142–143 of the first reply are a "visitor ID".
+2. **Marry or Back.** Press a button on the Tama, then Connection → App → Return? (かえる？) → Yes. Send the Marriage messages, or Back if the Tama isn't an adult.
+
+The menu names come from MyMeets' own instruction pictures inside the exe. For items, MyMeets uses Connection → App → **Present** (プレゼント).
+
 ## 5. Item file format
 
 Items are the `.txt` files in MyMeets `assets/items/<lang>/`. They're actually binary. Their multi-byte fields are **big-endian**.
@@ -118,14 +167,39 @@ Items are the `.txt` files in MyMeets `assets/items/<lang>/`. They're actually b
 | 0x200 | image frames (below) |
 | last 2 | checksum, big-endian: sum of every earlier byte |
 
+MyMeets reads the header as:
+
+- 0x30: u32 real file size.
+- 0x48: u32 file size.
+- 0x4c: u16 ROM version.
+- 0x4e: u32 **destination**. This sets the type:
+  - `81071f00` wallpaper
+  - `81010101` / `81010102` / `81010201` / `81010d02` food
+  - `81042a01` item
+  - `81023400` / `81023500` accessory
+  - `94025b01` game
+  - `94024702` station
+- 0x52: u64 signature.
+- 0x5a: ID.
+- 0x5e: name in mojis.
+- 0x76: price.
+- 0x78: animation.
+- 0x7a: hunger effect.
+- 0x7b: happiness effect.
+
+Images start at 0x200, except for accessories, where they start at 0x5c2. Games and stations have no images that MyMeets reads.
+
+**Mojis (Tama text):** byte pairs of `language` (4 = JP, 8 = EN) and `row<<4 | column`, looked up in a 16×16 table (the `MOJIS` table in the site).
+
 ### Image frames (at 0x200)
 
 - The section starts with a u16 frame count.
 - Each frame has:
-  - a u16 size, then width, height and color count, then 3 more bytes;
+  - a u16 size, then width, height and color count, then u16 1 (or 256 for 8-bit), then 0xff;
   - a palette of u16 big-endian BGR565 colors;
-  - 4-bit pixels (the high nibble is the left pixel).
-- Palette slot 0 is transparent (`07e0`, green).
+  - pixels: 4-bit if there are 16 colors or fewer, otherwise 8-bit.
+- **The low nibble is the left pixel.** We had this backwards. MyMeets' `TamagoImage` reads low-first, and every official item is much smoother read that way (464k vs 567k neighbour changes). Our photo wallpapers and the four presets were sent with each pair of pixels swapped. Both are fixed now.
+- Slot 0 / pixel (0,0) is the transparent color (`07e0`, green).
 
 | Type | Frames |
 |---|---|
@@ -146,9 +220,20 @@ Items are the `.txt` files in MyMeets `assets/items/<lang>/`. They're actually b
 
 ## 6. What's been built
 
-### TamaOS Sender (`index.html`, iPhone and any Web Bluetooth browser)
+### TamaOS site (`index.html` + `data/`, iPhone and any Web Bluetooth browser)
 
-- One self-contained HTML page. (The earlier source copy was `tamaos_src.html`. `index.html` is the standalone build, and it's the one to edit now.)
+- Built from `tools/page.html` by `tools/build_page.py`. The Shop and Marry tabs load `data/` when they're first opened.
+- **Tabs:**
+  - **Shop** is MyMeets' Catalogue: English and Japanese items by type, with search, animated preview and price.
+  - **Custom** is the original sender (presets, photo, starter, item file).
+  - **Marry** is MyMeets' Marriage:
+    - pick body, face, head and back from any of 118 characters;
+    - 13 color sets for body, head and back;
+    - Random character, Random colors, or a whole character;
+    - Marry character / Get character / Random genes;
+    - Boy, girl or random sex, and English or Japanese speech;
+    - then Visit → Marry, or Back.
+- The visit state is kept in localStorage, so reloading between step 1 and step 2 is safe.
 - **iPhone:** Safari has no Web Bluetooth, so use the **Bluefy** browser. Bluefy only allows Bluetooth on a top-level https page. The Claude artifact frame blocks it, so the page has to be self-hosted.
   - It was on tiiny.host, but that account is out of uploads.
   - Now: **GitHub Pages** from this repo (Settings → Pages → deploy from `main`). The URL is `https://aviscryptostuff-bit.github.io/tamasend/`.
@@ -156,7 +241,7 @@ Items are the `.txt` files in MyMeets `assets/items/<lang>/`. They're actually b
 - Features:
   - Starter wallpaper.
   - Photo → wallpaper. Converts to 128×128 with 15 colors, using median-cut quantizing and Floyd–Steinberg dithering. The wallpaper number auto-increments from 51001 and is saved in localStorage.
-  - Price override for wallpapers (default 1).
+  - Price override (now for any item, off by default so items go out exactly as MyMeets sends them).
   - Gotchi Points (0–99,999).
   - Animated preset cards: pistol, skateboard, pizza, burger.
   - A step-by-step log, with `describe()` turning Bluefy's raw error codes into readable messages.
@@ -167,6 +252,11 @@ Items are the `.txt` files in MyMeets `assets/items/<lang>/`. They're actually b
   - 50 / 1,000 / 99,999 points build correctly;
   - the wallpaper encoder round-trips the real wallpaper;
   - all presets are valid. This was re-checked in this repo: each has a good checksum, its length matches 0x4a, and its number at 0x5a matches its ID.
+- Verified later on 2026-11-07, in headless Chromium:
+  - the page's JavaScript matches `tools/mymeets_ref.py` byte for byte for character pictures, small parent pictures, the 32 KB character block, a full 39,334-byte marriage message, and the Visit, Back and hello messages;
+  - the item hello still equals the real MyMeets capture;
+  - with a simulated Tama, Shop send, Visit and Marry each run end to end with the right operands and commands and a correct checksum.
+  - **None of the new features has been tried on a real Tama yet.** The Python port and the JS were both written from MyMeets' IL, so a misreading of the IL would be in both.
 
 ### Custom items (`custom/build_items.py`, on the PC)
 
@@ -180,6 +270,7 @@ These are built from real MyMeets items used as templates. The script swaps in n
 | burger | `gh00083` (meal) | `tg16_gh03201_1` | meal | `items/burger_gh03201.txt` |
 
 - All are priced at 1.
+- Their pixels were drawn high-nibble-first. `tools/fix_nibbles.py` re-saved them low-nibble-first, so they should now look as designed on the Tama.
 - Sprites are drawn as text maps in the script (`PISTOL_BIG` 30×19, `PISTOL_HELD` 18 wide with the grip at the left edge).
 - `build_items.py` itself isn't in this repo yet. Copy it in from the PC when you're back on one.
 
@@ -190,7 +281,7 @@ These are built from real MyMeets items used as templates. The script swaps in n
   - The new version also has `--address MAC` (skips scanning) and `--dump FILE` (builds the message without sending), and it warns about a bad checksum or a 0x5a/ID mismatch.
 - `tamaos_scan.py` is the first scanner/GATT mapper.
 - `tools/parse_capture.py` parses btvs/Wireshark captures.
-- `ilread.py` is a small .NET IL disassembler, used to read `MyMeets.exe`.
+- `ilread.py` is a small .NET IL disassembler, used to read `MyMeets.exe`. A newer one, built on the `dnfile` Python package, was written in the cloud session. It decodes method signatures, enum values and static arrays. It isn't in the repo, but `tools/mymeets_ref.py` holds what it found.
 - Sniffing setup: btvs at `C:\BTP\v1.14.0\x86\btvs.exe` plus Wireshark, with MyMeets at `Downloads\MyMeets2_3_7`.
 
 ## 7. Problems solved (so they don't come back)
@@ -210,20 +301,23 @@ These are built from real MyMeets items used as templates. The script swaps in n
 | Gun not in the hand | Frame 1 is the held sprite, so it was redrawn |
 | Coins "still don't work" | The owner was on the old tiiny page. Host the new `index.html`. |
 | Page told iPhone users to "use Chrome on Android" | The no-Bluetooth messages now mention Bluefy for iPhone |
+| Sprites and photos had pixel pairs swapped | 4-bit pixels are low nibble first (§5); encoder and presets fixed |
 
 ## 8. Next steps
 
-1. **Turn on GitHub Pages** for this repo (Settings → Pages → Deploy from a branch → `main`, `/ (root)`). Then open `https://aviscryptostuff-bit.github.io/tamasend/` in Bluefy.
-2. **Test coins.** Send the Starter wallpaper with 50 points. If it fails, save the log.
-3. If points work with wallpapers but not with toys or food, try version byte `03` on those items. Or copy exactly how MyMeets sends points with that item type (capture it).
-4. Possible additions:
+1. **Turn on GitHub Pages** for this repo (Settings → Pages → Deploy from a branch → `main`, `/ (root)`), with `index.html` **and** `data/` on `main`. Then open `https://aviscryptostuff-bit.github.io/tamasend/` in Bluefy.
+2. **Test the Shop.** Send any wallpaper from the catalogue. Then **test Marry** with an adult Tama: step 1 (Visit), then step 2. If the Tama's menus don't match the steps on the page, send screenshots.
+3. Re-send a preset (for example the pistol) and check that the sprite looks cleaner than before.
+4. **Test coins.** Send the Starter wallpaper with 50 points. If it fails, save the log.
+5. If points work with wallpapers but not with toys or food, try version byte `03` on those items. Or copy exactly how MyMeets sends points with that item type (capture it).
+6. Possible additions:
    - a one-tap "Send coins" button;
    - more custom items using other behavior IDs;
-   - decode accessories;
-   - decode the effect bytes (hunger and happiness);
-   - character data (MyMeets `assets/characters`).
-5. Back on a PC: use `pc/tamaos_send.py` from this repo, and copy `custom/build_items.py`, `tools/` and `ilread.py` into the repo.
-6. The longer-term ideas (hub, arcade, firmware) are still open.
+   - decode the accessory header (images start at 0x5c2; 1,350 bytes before that aren't decoded);
+   - custom marriage partners drawn from scratch (the character format is now understood).
+   - (Done: effect bytes are at 0x7a hunger and 0x7b happiness. Character data is used by the Marry tab.)
+7. Back on a PC: use `pc/tamaos_send.py` from this repo, and copy `custom/build_items.py`, `tools/` and `ilread.py` into the repo.
+8. The longer-term ideas (hub, arcade, firmware) are still open.
 
 ## 9. Notes for whoever picks this up
 

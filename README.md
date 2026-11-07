@@ -1,26 +1,32 @@
 # TamaOS
 
-Send your own wallpapers, toys, food and Gotchi Points to a Tamagotchi On / Meets over Bluetooth. You don't need the official app.
+Send items, Gotchi Points and a marriage partner to a Tamagotchi On / Meets over Bluetooth. You don't need the official app.
 
-- **Phone (iPhone or Android):** `index.html`, a single web page.
-- **PC (Windows):** `pc/tamaos_send.py`.
-- **Ready-made items:** `items/` (pistol, skateboard, pizza, burger and the starter wallpaper).
-- **Everything we've learned so far:** [HANDOFF.md](HANDOFF.md).
+The site (`index.html`) has three tabs:
 
-## Put the page online (one time)
+- **Shop:** every item from MyMeets (484 English, 365 Japanese): wallpapers, food, items, accessories, games and stations. You can send any of them with Gotchi Points.
+- **Custom:** our own pistol, skateboard, pizza and burger, a wallpaper made from your photo, or any item file.
+- **Marry:** build a partner from body, face, head and back parts in 13 color sets, then marry your adult Tama. This is MyMeets' Marriage feature.
+
+Everything we've learned so far is in [HANDOFF.md](HANDOFF.md).
+
+## Put the site online
+
+Upload **`index.html` and the whole `data` folder** to the repo. The Shop and Marry tabs read their pictures from `data/`.
 
 1. On GitHub, open this repo and go to **Settings → Pages**.
 2. Under **Build and deployment**, choose **Deploy from a branch**. Pick **main** and **/ (root)**, then tap **Save**.
-3. Wait a minute or two. The page will be at **https://aviscryptostuff-bit.github.io/tamasend/**.
+3. Wait a minute or two. The site will be at **https://aviscryptostuff-bit.github.io/tamasend/**.
 
 ## Send from iPhone
 
-1. Install the **Bluefy** app from the App Store. Safari can't use Bluetooth.
+1. Install **Bluefy** from the App Store. Safari can't use Bluetooth.
 2. Open the link above **in Bluefy**.
-3. Check you have the new page. The top should say **+0 PTS**, and the coins box should say *"Sent along with the item. 0 to 99,999."*
-4. On the Tama: **Connection → APP**, press back, then **Connection → Download**. The Tama's clock has to be set to daytime, because it won't connect while it's asleep.
-5. On the page, pick an item, set the coins (try 50), and tap **Connect & send**. Choose **TMGC_meets**.
-6. If it fails, tap **Copy log** and send a screenshot or the log text.
+3. On the Tama, pick **Connection → APP**, press back, then pick **Connection → Download**. The Tama's clock has to be set to daytime.
+4. Pick an item, set the coins, tap **Connect & send** and choose **TMGC_meets**.
+5. If it fails, tap **Copy log** and send a screenshot or the log text.
+
+The Marry tab has its own two steps on the page. First your Tama visits, then it comes back married.
 
 ## Send from a PC
 
@@ -29,4 +35,6 @@ pip install bleak
 python pc/tamaos_send.py items/wallpaper_bg50001.txt --points 50
 ```
 
-Use `--delay 45` if the Tama's progress bar falls behind. Use `--dump out.bin` to build the message without sending it.
+## Changing the site
+
+Edit `tools/page.html`, then run `python tools/build_page.py`. This writes `index.html` with the starter wallpaper, presets, color sets and DNA tables filled in. `tools/make_data.py <MyMeets assets folder> data` rebuilds the `data` folder.
