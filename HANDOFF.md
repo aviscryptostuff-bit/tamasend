@@ -34,6 +34,8 @@ TamaOS sends custom content to a Tamagotchi On / Meets over Bluetooth Low Energy
 
 ---
 
+**Confirmed on the device (2026-11-07):** a marriage from the Marry tab worked. The Tama showed a baby and asked for a name, which is the normal result of a marriage. Still to confirm: which mode was used, and whether the Experimental (not adult) switch was on.
+
 ## 1. Goal and direction
 
 - The owner wants the Tama to become something "completely different than the base Tama idea": a custom gadget, not a pet. It should be something nobody else has done.
