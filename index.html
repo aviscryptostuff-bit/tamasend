@@ -521,7 +521,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- main flow ----------
 if (!navigator.bluetooth) {
-  show($("support"), "This browser can't use Bluetooth here. Open this page directly in Chrome on Android (copy the link and paste it into Chrome), then try again.", "warn");
+  show($("support"), "This browser can't use Bluetooth here. On iPhone, open this page in the Bluefy app. On Android, open it in Chrome. Copy the link and paste it into that browser, then try again.", "warn");
 }
 $("goBtn").addEventListener("click", async () => {
   let item = currentItem();
@@ -537,7 +537,7 @@ $("goBtn").addEventListener("click", async () => {
   const points = Math.max(0, Math.min(MAX_POINTS, parseInt($("pts").value, 10) || 0));
   $("pts").value = points; $("lcdPts").textContent = `+${points} PTS`;
   const pace = Math.max(10, Math.min(200, parseInt($("delay").value, 10) || 40));
-  if (!navigator.bluetooth) { show(result, "Bluetooth isn't available in this view. Open the page in Chrome on Android.", "bad"); return; }
+  if (!navigator.bluetooth) { show(result, "Bluetooth isn't available in this view. Open the page in Bluefy (iPhone) or Chrome (Android).", "bad"); return; }
 
   $("goBtn").disabled = true; progress(0);
   let device;
@@ -582,7 +582,7 @@ $("goBtn").addEventListener("click", async () => {
     log("Done");
   } catch (e) {
     const msg = e && e.name === "NotFoundError" ? "No Tamagotchi picked. Do the APP → Download trick, then tap Connect & send while it's waiting."
-      : e && e.name === "SecurityError" ? "Bluetooth is blocked in this viewer. Open this page in Chrome on Android and try again."
+      : e && e.name === "SecurityError" ? "Bluetooth is blocked in this viewer. Open this page directly in Bluefy (iPhone) or Chrome (Android) and try again."
       : `Stopped at the last "step" in the log. Details: ${describe(e)}`;
     lcd("ERROR", "Transfer failed");
     show(result, msg, "bad");
