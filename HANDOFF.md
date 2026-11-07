@@ -329,3 +329,64 @@ These are built from real MyMeets items used as templates. The script swaps in n
 - The owner is non-technical and phone-first. Give short, step-by-step instructions, and expect screenshots back.
 - Treat the downloaded MyMeets package as untrusted. Only read it; don't run it.
 - Never claim something works on the device until the owner confirms it.
+
+## 10. Running our own code on the Tama (from Bolter's Magic Hut)
+
+The owner remembered a **"time potion"** from the **Magic Hut** that grows a Tama up. It isn't in MyMeets. It's a community file by Bolter (MyMeets' author) at https://archive.org/details/magic_hut, copied into `community/` along with **Moon Terrace** and the **Potion** game. The Shop tab offers them under "Community mods". Sent the normal way (App → Download), they install as a new location or game.
+
+### Locations and games contain ARM code
+
+- **Locations** (destination `94024702`) and **games** (`94025b01`) are programs, not pictures.
+  - 0xAE is a u32 code size.
+  - 0x200 starts with `00 01 xx xx`, then the code starts at **0x204**.
+  - The code is **32-bit ARM** (not Thumb): `push {..,lr}`, `mov lr,pc; bx r3` calls, literal pools.
+- The file is mapped at **0x207F0000**, so the code reaches its own pictures as `0x207F0000 + file offset`.
+- **Firmware functions** are called through fixed Thumb addresses `0x200004xx`–`0x20003Dxx`. Official and Bolter's files use the same ones, so it's a stable API. Seen so far (guesses from use):
+
+| Address | Seen as |
+|---|---|
+| `0x20000425`, `0x20000431`, `0x2000043D` (`0x20000430 + 1/+0xD`) | button checks |
+| `0x20000449`, `0x20000455`, `0x20000461` | button sounds |
+| `0x200008FF`, `0x2000091F` | draw a picture |
+| `0x20000933` | sound or wait (`r0 = 0x1E, r1 = 7`) |
+| `0x2000063F` | delay (ms) |
+| `0x20000499` | random number |
+| `0x20000F47` | get a firmware resource by ID |
+| `0x20003B0F` | screen or frame related |
+
+- `0xF800D700 + 0xDA/0xDB/0xDC` hold the three button-press flags. The code clears them after reading.
+- `disasm_item.py` (in `tools/`) prints an annotated disassembly. It needs `pip install capstone`.
+
+### How the Magic Hut changes the pet
+
+- **Firmware detection:** it sums the bytes of firmware resource `0x37`. `0x2394` gives region 0 and `0x2C3A` gives region 1 (probably JP vs EN/On). It does the same with resource `0x774`, giving one of 5 known builds.
+- **Pet save pointer:** `*(u32*)0x200004D4`.
+- **Pet variables** are at pointer + offset, from the table at file 0x1E44 (12 entries per region):
+
+| Variable | Region 0 offset | Region 1 offset | Size | What the Magic Hut does with it |
+|---|---|---|---|---|
+| 0 | 0x005 | 0x005 | u8 | set to 6 (with 1 and 2): probably hunger or hearts |
+| 1 | 0x00C | 0x00C | u8 | cleared; bit 7 set by the time potion (probably an "evolve" flag) |
+| 2 | 0x011 | 0x011 | u8 | set to 100: probably happiness |
+| 3 | 0x020 | 0x020 | u32 | set to 99,999: **Gotchi Points** |
+| 4 | 0x036 | 0x036 | u16 | **+1 if ≤ 4: growth stage (time potion)** |
+| 5 | 0x03A | 0x03A | ? | |
+| 6 | 0x052 | 0x052 | u8 | read |
+| 7 | 0x22E | 0x22E | ? | |
+| 8 | 0x38A | 0x3A0 | ? | |
+| 9 | 0x282 | 0x28A | ? | |
+| 10 | 0x372 | 0x384 | u8 | bit 0 toggled |
+| 11 | 0x404 | 0x420 | u8 | set, and mirrored to `0xF800C058` (region 0) or `0xF800C060` (region 1) |
+
+- Getter and setter helpers in magic_hut.txt: set8 `0x43C`, set16 `0x458`, set32 `0x474`, get8 `0x490`, get16 `0x4A8`, get32 `0x4C0`. The potion routines start at `0x5A8` (time), `0x5FC` (stats), `0x698` (toggle) and `0x788` (coins).
+- **Header differences:**
+  - Bolter's files have 0x48 = file size − 2, where official files have the full size.
+  - potion.txt's trailing checksum doesn't match the usual sum.
+  - People report them working through WebMeets anyway, and we send them unchanged.
+
+### Next steps for custom code
+
+1. Send the Magic Hut and confirm on the device that the time potion grows a Tama.
+2. Compare against a "Save my Tama's data" dump from a Visit. The visit reply probably carries some of the same pet variables.
+3. Build our own location ("TamaOS Lab"): reuse Bolter's helpers and API calls, with our own menu, for example "grow up", "max coins", "full stats", or set any variable. This needs an ARM assembler (`arm-none-eabi-as`, or a small Python assembler). How the firmware enters the code at 0x204 still needs mapping, by comparing the official station and game files.
+4. **Risk:** custom code runs with full access to the Tama. A bad write can corrupt the save; a reset should recover it, but that's unverified. Test changes one at a time.

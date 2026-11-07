@@ -161,7 +161,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
       <h2>Catalogue</h2>
       <div class="row">
         <label class="f" for="catLang">Language
-          <select id="catLang"><option value="en">English items</option><option value="jp">Japanese items</option></select></label>
+          <select id="catLang"><option value="en">English items</option><option value="jp">Japanese items</option><option value="mods">Community mods (Magic Hut…)</option></select></label>
         <label class="f" for="catSearch">Search
           <input type="search" id="catSearch" placeholder="Name or number"></label>
       </div>
@@ -701,7 +701,9 @@ async function showCatalog() {
     frag.append(lab);
   }
   $("catGrid").replaceChildren(frag);
-  $("catStatus").textContent = list.length ? `${list.length} ${TYPE_NAMES[cat.type].toLowerCase()} from MyMeets. Tap one to pick it.` : "Nothing matches that search.";
+  $("catStatus").textContent = !list.length ? "Nothing matches that search."
+    : cat.lang === "mods" ? `${list.length} ${TYPE_NAMES[cat.type].toLowerCase()} made by Bolter (MyMeets' author), from archive.org. These run their own code on the Tama: Magic Hut's potions change your Tama's stats, including a grow-up potion. Untested by us.`
+    : `${list.length} ${TYPE_NAMES[cat.type].toLowerCase()} from MyMeets. Tap one to pick it.`;
 }
 function pickCatalog(row, blob) {
   const bytes = catItemBytes(row, blob);

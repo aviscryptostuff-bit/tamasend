@@ -11,6 +11,15 @@ for lang in ("en", "jp"):
         rows.append([len(blob), len(d), it["type"], it["id"], it["name"], it["price"], it["asset"]])
         blob += d
     open(f"{out}/items_{lang}.bin", "wb").write(blob); index[lang] = rows
+# Community files (e.g. Bolter's Magic Hut) from <repo>/community, shown as their own catalogue.
+extra = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "community")
+blob = bytearray(); rows = []
+for f in sorted(glob.glob(f"{extra}/*.txt")):
+    d = open(f, "rb").read(); it = mm.parse_item(d)
+    if not it: continue
+    rows.append([len(blob), len(d), it["type"], it["id"], it["name"], it["price"], it["asset"]]); blob += d
+if rows:
+    open(f"{out}/items_mods.bin", "wb").write(blob); index["mods"] = rows
 json.dump(index, open(f"{out}/items.json", "w"), ensure_ascii=False, separators=(",", ":"))
 files = {os.path.basename(f).lower(): f for f in glob.glob(f"{src}/characters/*")}
 ids = sorted({int(os.path.basename(f)[3:7]) for f in files.values()})
