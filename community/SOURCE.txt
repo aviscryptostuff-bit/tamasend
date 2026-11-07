@@ -1,0 +1,12 @@
+Magic Hut and Moon Terrace for Tamagotchi ON / Meets
+
+Download the two text files: magic_hut.txt and moon_terrace.txt
+
+Load a text file on WebMeets "Compiled files" webpage: https://tamagotchicenter.com/webmeets/custom-items?itemType=compiled%20files
+On the Tamagotchi, go to the connection menu, select App -> Download
+
+It will download a new location on your Tamagotchi.
+
+
+Source: https://archive.org/details/magic_hut (files by Bolter, author of MyMeets).
+Downloaded 2026-11-07. Sizes: magic_hut 27650, moon_terrace 27506, potion 20526 bytes.
