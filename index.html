@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TamaOS Sender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column like a handheld; an LCD-style status window up top, controls below. */
+:root {
+  --bg: #f3f1f7;
+  --surface: #ffffff;
+  --ink: #221d2e;
+  --muted: #6c6580;
+  --line: #ddd8e8;
+  --accent: #e2457a;
+  --accent-ink: #ffffff;
+  --lcd: #c9d8b6;
+  --lcd-ink: #2e3a22;
+  --ok: #1f8a5b;
+  --warn: #b7791f;
+  --bad: #c53030;
+  --font-display: "DotGothic16", "Courier New", monospace;
+  --font-body: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17141f; --surface: #221e2c; --ink: #eeeaf6; --muted: #a59fb8; --line: #363044;
+    --accent: #ff6b9a; --accent-ink: #1b0f15; --lcd: #3a4a2e; --lcd-ink: #d9ecc0;
+    --ok: #4fd1a0; --warn: #f2b84b; --bad: #ff7b7b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17141f; --surface: #221e2c; --ink: #eeeaf6; --muted: #a59fb8; --line: #363044;
+  --accent: #ff6b9a; --accent-ink: #1b0f15; --lcd: #3a4a2e; --lcd-ink: #d9ecc0;
+  --ok: #4fd1a0; --warn: #f2b84b; --bad: #ff7b7b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: grid; gap: 4px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 30px; line-height: 1.1; margin: 0; letter-spacing: 0.02em; }
+.sub { color: var(--muted); margin: 0; text-wrap: balance; }
+
+.lcd {
+  background: var(--lcd); color: var(--lcd-ink); border-radius: 14px; padding: 16px;
+  font-family: var(--font-display); display: grid; gap: 10px;
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--lcd-ink) 18%, transparent);
+}
+.lcd-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 15px; }
+.lcd-big { font-size: 22px; min-height: 1.3em; }
+.bar { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--lcd-ink) 15%, transparent); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0%; background: var(--lcd-ink); transition: width .2s linear; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; font-weight: 800; }
+ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+.choices { display: grid; gap: 8px; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.choice input { margin-top: 4px; accent-color: var(--accent); }
+.choice b { display: block; }
+.choice small { color: var(--muted); }
+input[type=file] { max-width: 100%; font: inherit; color: var(--muted); }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label.f { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+label.f small { font-weight: 400; color: var(--muted); }
+.shop { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.card { display: grid; gap: 2px; justify-items: center; text-align: center; padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; position: relative; }
+.card input { position: absolute; opacity: 0; pointer-events: none; }
+.card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+.card canvas { width: 96px; height: 64px; image-rendering: pixelated; background: var(--lcd); border-radius: 6px; margin-bottom: 4px; }
+.card small { color: var(--muted); font-size: 12px; }
+.preview { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.preview canvas { width: 192px; height: 192px; image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); max-width: 100%; }
+.pv-side { display: grid; gap: 10px; flex: 1 1 160px; min-width: 0; }
+.pv-side small { color: var(--muted); }
+.photo-opts { display: grid; gap: 10px; }
+input[type=text] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+.toggle { display: flex; gap: 8px; align-items: center; min-height: 40px; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+input[type=number] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; font-variant-numeric: tabular-nums; }
+
+button { font: inherit; font-weight: 800; border: 0; border-radius: 12px; padding: 14px 16px; cursor: pointer; }
+.go { background: var(--accent); color: var(--accent-ink); font-size: 17px; width: 100%; }
+.go:disabled { opacity: .5; cursor: not-allowed; }
+.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 8px 12px; font-size: 13px; }
+button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+
+.msg { border-radius: 10px; padding: 10px 12px; font-size: 14px; border: 1px solid var(--line); }
+.msg.bad { border-color: var(--bad); color: var(--bad); }
+.msg.ok { border-color: var(--ok); color: var(--ok); }
+.msg.warn { border-color: var(--warn); color: var(--warn); }
+
+.logbox { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.45; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; height: 180px; overflow: auto; white-space: pre; color: var(--muted); }
+.logrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <h1>TamaOS Sender</h1>
+    <p class="sub">Sends wallpapers and items to your Tamagotchi On over Bluetooth, straight from your phone.</p>
+  </header>
+
+  <div class="lcd" aria-live="polite">
+    <div class="lcd-row"><span id="lcdState">READY</span><span id="lcdPts">+0 PTS</span></div>
+    <div class="lcd-big" id="lcdMain">Pick an item below</div>
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="lcd-row"><span id="lcdItem">bg50001</span><span id="lcdPct">0%</span></div>
+  </div>
+
+  <div id="support" class="msg warn" hidden></div>
+
+  <section>
+    <h2>On the Tamagotchi</h2>
+    <ol class="steps">
+      <li>Make sure it's awake. It refuses connections while sleeping; setting its clock to daytime wakes it.</li>
+      <li>Go to <b>Connection → APP</b>, back out, then <b>Connection → Download</b>.</li>
+      <li>While it's on the waiting screen, tap <b>Connect &amp; send</b> and pick <b>TMGC_meets</b>.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Item</h2>
+    <div class="choices">
+      <div class="shop" role="group" aria-label="TamaOS custom items">
+        <label class="card"><input type="radio" name="src" value="preset:pistol" checked>
+          <canvas data-anim="pistol" width="96" height="64"></canvas>
+          <b>Pistol</b><small>Toy · fires a bullet at a target</small></label>
+        <label class="card"><input type="radio" name="src" value="preset:skateboard">
+          <canvas data-anim="skateboard" width="96" height="64"></canvas>
+          <b>Skateboard</b><small>Toy · your Tama rides it</small></label>
+        <label class="card"><input type="radio" name="src" value="preset:pizza">
+          <canvas data-anim="pizza" width="96" height="64"></canvas>
+          <b>Pizza</b><small>Snack · makes your Tama happy</small></label>
+        <label class="card"><input type="radio" name="src" value="preset:burger">
+          <canvas data-anim="burger" width="96" height="64"></canvas>
+          <b>Burger</b><small>Meal · fills hunger</small></label>
+      </div>
+      <label class="choice"><input type="radio" name="src" id="srcPhoto" value="photo">
+        <span><b>Your photo</b><small>Cropped to 128 × 128 and reduced to 15 colors</small>
+        <input type="file" id="photoIn" accept="image/*"></span></label>
+      <label class="choice"><input type="radio" name="src" id="srcBuiltin" value="builtin">
+        <span><b>Starter wallpaper</b><small>tg19_bg50001 · the one we captured from MyMeets · 8,746 bytes</small></span></label>
+      <label class="choice"><input type="radio" name="src" id="srcFile" value="file">
+        <span><b>Item file from your phone</b><small>Any MyMeets item <code>.txt</code> (wallpapers, food, toys)</small>
+        <input type="file" id="fileIn" accept=".txt,application/octet-stream,text/plain"></span></label>
+    </div>
+    <div id="itemInfo" class="msg" hidden></div>
+    <div class="preview" id="previewBox" hidden>
+      <canvas id="preview" width="128" height="128" aria-label="Wallpaper preview"></canvas>
+      <div class="pv-side">
+        <small id="previewLabel">Preview of what the Tama will show</small>
+        <div class="photo-opts" id="photoOpts" hidden>
+          <label class="f" for="wpName">Wallpaper name
+            <input type="text" id="wpName" maxlength="21" value="TamaOS photo"></label>
+          <label class="f" for="wpId">Wallpaper number
+            <input type="number" id="wpId" min="50012" max="65535" value="51001">
+            <small>Use a new number for every photo. The starter is 50001.</small></label>
+          <small>The Tama shows the name in lowercase letters only, up to 11.</small>
+          <span class="toggle"><input type="checkbox" id="dither" checked> <small>Dithering (smoother photos)</small></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Settings</h2>
+    <div class="fields">
+      <label class="f" for="pts">Gotchi Points
+        <input type="number" id="pts" min="0" max="99999" value="0">
+        <small>Sent along with the item. 0 to 99,999.</small></label>
+      <label class="f" for="delay">Pace (ms per chunk)
+        <input type="number" id="delay" min="10" max="200" value="40">
+        <small>Raise it if transfers fail near the end.</small></label>
+      <label class="f" for="price">Shop price (wallpapers)
+        <input type="number" id="price" min="0" max="65535" value="1">
+        <small>The starter wallpaper costs 1,500 in the Tama's shop. This sets your own price.</small></label>
+      <label class="f" for="setPrice">Change the price
+        <span class="toggle"><input type="checkbox" id="setPrice" checked> <small>Only for wallpapers</small></span></label>
+    </div>
+  </section>
+
+  <button class="go" id="goBtn">Connect &amp; send</button>
+  <div id="result" class="msg" hidden></div>
+
+  <section>
+    <div class="logrow"><h2>Log</h2><button class="ghost" id="copyBtn">Copy log</button></div>
+    <div class="logbox" id="logBox" tabindex="0" aria-label="Transfer log"></div>
+  </section>
+</div>
+
+<script>
+const BG50001_B64 = "VEFNQUdPAHcAYQBsAGwAcABhAHAAZQByAC4AagBwAGcAAAAAAAAAAAAAAAAAAAAAAAAiKnRnMTlfYmc1MDAwMQAAAAAAAAAAAAAiKgMBgQcfAAAAAAAAAAAAw1EAAATnBOAE6wTrBO4E9gTkBOQE7QAAAAAAAAXcAAADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAASAkgIAPAAH/hRrOu3KOS1P//77fOfKF381sMKW3n5uaJF1PP3VPEBAQEBAQEBAQEBERERERERARERERERERERERAjAzABIRERERERERERERERERARERERERERERAQEEAQFBAQFBAQEBAQEBAQEREREREREQEREQEREREREiERERIQADAAMgERERIRIREREREREREQERERERERERERFEQRAQFBAQQBAQEBAQEBEREREREBEREREREBEREREhABIRIgIwAAMwACISEQIgEREREREREREREREREREREREREQEUQREBAUEBAQEBEREQIhERERERERERAREREREREQIgIlUlMAADMCBVJSIAEhERERERERERAREREREREREREBERFBQQEBBAEBAQEAERIWYiIiISEREREQEREREREREhUlVVJQADAwMgV1dVIhERERERERERAREQEREREREREREREUFEFBEBBAEBAQERESJmJkREJBIREREBEBERERERcnUlUlUCAwADcnciV1USERERERERERAREBERERERERERAREUEUEREEREEBAQESFmYiZEREQkEBERAQERERERIXdXJ3JVAjMzA3J3InVVJREREREREREQERARERERERERERFBEQERRBEEAQERESEiZiJCRERERAIQERABERERESF3clcnVwIAAAByJ3dXciUREREREREBEREQERERERERERERFBERERFEEBAQERBiZiJEREREREQkABEQARERERFyJyJ3cnUiIiIicndyJyJVEhEREQEAEBERARERERERERERQUEUEREBQQEBARERYmYmRERERESIJAABERERERERcndyJ3cimZmqqipyJ3dSVxIREQAQAREREREQERERERERERQRQREREUEREBARESFiJkREiEREiEQCEBEBEREREXJ3d3InmZmZqqqqKndyd3USERERERAREREREBERERERERERERFEARFBAQERARERIkJERIhERIhEAhAREQEREREhd3d3kpmZmaqqqqpyd3cnEREBEQERERERERARERERERERERERFBQRFBEQEBAREUJERESIRCK0SwIAEREBERERIXd3d5KZmZmpqqqqcndXJxEREREBESERESEQERERERERERERERRBERQRQRERERFCRES0S0REsksCABEREREREREicieZmZmZqaqqqip3IhIREREREREhEhEiAQEREREREREREREUQREUQRQQERERQkREIkJEIkQkIgAREREBERERAiMimZmamZmqqqoqIjMSERERERERASIiAhEQERERERERERERFBFEERQBESEiEiFEREQkRERCREQCEREREREREQIzI5mppJmZqqqqKgAzEhERESEREREiIhIRECERERERERERERQRQUQRERERQiQiRERCJEQiRCREAhAREREBERECM5KZmZqZmamqqqoCMxIREREiERERoqISEQEhEhEREREREREUEUERAQERESFEJEREQiREREQkRAIAERERERERAjOSmZmZmZmZqqqqAjMSEREiIiIRESIiEhEhIiISERERERERFBFBERERARERIkRCRCRCREREAiIAABAREREREQIzkpmZmZmZmZmqqgIzEhEhIiIiIhIgIhAiIiIiIhERERERERQRFBEREREREQFCRERERERERAIAAAAQERERERECM5KZmZmZmZmZmaoCMxIRIiIiIiIiIiIiIiIiIiISEREREREUERQRERERERERIEJERERERCIAAAABEBERERERAjOSmZmZmZqZmZmZAjMSESIiIiIiIiIiIiIiIiIiEhERERERFBEUEQEREREBEREgIkREIiIAAAAQEREREREREQIzkpmZmZmZmZmZmQIzEiEAICIiIiIiIiIiIiIiACARERERERQREREREREREBERAQAiIgAAAAAAEBERERERERECM5KZmpmZmZmZmZkCMxIBEQECICIAIiICICIAAhEBEREREREUEREREREREREREREBAAAAAAAAAAERERERERERAjOSmZmZmZmZmZmZAjMSEREREAECESIiEgECEQARERERESESFCIQERERAREREREREQAAAAAAABEREBEREREREQIzkpmZmZmZmZmZmQIzEhEREREREBECAhIRIBEREBERERERISIRERERERERERERERERAAAAABERERARERERERECM5KZmZmZmZmpmZkCMxIREREREREhEBIgESESERARERERISIiIhEREQERERERERERERERoREREREQERERERERAjOSmZmZmZmZSpqZAjMSERERERERARESAREhEhERERERESGhoiEREREREREREREREREREREREREaEBEREREREQIzIpkpmSmZKakpmQIzEhEREREREREREhERIioRERERERERIiESEREQEREREREREREREREREREREQERERERERECM5IpmSmZKZkpmSkCMxIREREREREREREREaIqEhERERERIRERIREREQERERERERGhEREaERoREREBERERARERAjOSkpKSkpKSkpKSAjMSERERERERERERERGiqiISEREREREREREREREREBEREREREaEREaERERERAREREREREQIzIikpKSkpKSkpKQIzEhERERERERERERERoqoqIhIREREREREREREREREQEREREREREaEREREREREQERERERECMyKSIpIikiKSIpICMxIREREREREREREREaIiIgAiEhERERERERERERARERERERERERoaGqERERERERERERERAjOSIpIikiKSIpIiAjMSEREREREREREREREiAgARwiwiEREREBERARERERERERERGqGhoaEREREREREAEREREQIzIiIiIiIiIiIiIgIzEhERERERERERERERAhAREcLMLCIRERERERERIREREREaEREaGh0aGhGhERERERERERECMyIiIqIiIiIiIioCMxIRERERERERERERERARERHCzCIgIiISERERIiIRERERERERoaGtoRERERERERERERERAjMiIiJKKiIiIiIiAjMSERERERERERERERERERERwiwCASCqKiIiIsLMEBERERGhERoa3RoaoRERERERERAREQIzIiIioiIiIiIiIgIzEhEREREREREREREREREREcIiEBEhqqoiAMLMzBERERERERqh0dehERqhERERERERERECMyIiIiIiIiIiIiICMxIREREREREREREREREREREiAhERIaoqAhEgzMwQERARERERGtp3GhqhERERERERERERAjMiIiIiIiIiIiIiAjMSERERERERERERERERERERAhARESGqKhARIcLMERERERGhEaGh0qERERERoREREREREQIjAAAAAAAAAAAAACAzEhERERERERERERERERERERAREREhKgIREQEiLBERERERERERIhIaERoRIhIRERERERECMjMzMzMzMzMzMzMzMhIRARERERERERERERERERERERERASIQERERICwQEREREREREaIqEhEREUISERERERERIjMzMzMzMzMzMzMzMyMSEREREREREREREREREREREREREREAEREREQEiEREREaEREREiqioRESIkIRIRESIRESIiIiIiIiIiIiIiIiIiEhEREREREREREREREREREREREREiIhERARERABEREREREaERoioqESFEREQkESEkEREAAAAAAAAAAAAAAAAAABAREREREREREREREREREREREREhAAASEREREREREBEREREREaKqEiISIkQkEhIhJBERERERERERERERARERERERARERERERERERERERERERoRERAiAiABEREREREQEREBERERGiqiIkRBEiEkskQhIREREREREREREREREQERERERARERERERERERERERGhEREREQIgABAREREREBERERERERERoipCJERLEbG9JEQSEREREREREREREREREBEREREQERERERERERERERERERERoRECIBAREREREREREREREREiIqIqRCK0vURESyIUIiIREREREREREREREQEQEREREBEREREREREREREREREREREhIgISERERERERERERESEiAACiKkIRQktERERCEQIAIhIRERERERERERERARERERARERERERERERERERERGhEiQkQkIhIRERERERERESECADAzoqoiEhJEREsUESEzMzMjEhEREREREQEREQEREREQERERERERERERERoRGhEiokRKSkQiERERARERESECADMzIiIiMyMiEbS9ISIiIjMzMyMSERERERERERAAEREBEREREREREREREREREaGhokqkREpKRBIREREREBECMDMzIwAAADIzshIRGyIAAAAyMzMzIxEREREREREREQARARERERERERERERoREaERKqKnSkqkREQSEREREREhMDMzMyJEREQyI7srIiIjRLREIjMzMzMSEREREREREREBEAEREREREREREREREREaoSKlp6pKSkqkIhEREREBITMzMyM0QkskMyO7u7srM0LbK0MyMzMzAhEREREREREREQEBERERERERERERERERERpSWqeqqqpKSiQBEREBESEzMzMzQrK9ITOyu7u7uzISsSEkMzMzMwIQEREREREREREREBERERERERERERGhoaGhUnqqVXqqqkoqEREQERABMjMzMzMjIjIzsru7u7syIyIyMzMzMyMAEBERERERERERERARERERERERERoREREaGlKnWlp1qqqqKhEREQEBISAyMzMzMzMzI7u7u7u7KzMzMzMzMyMyAgAREREREREREREQEREREREREREREaGhoSFSVyWidaWqqicSAREQECEAIDIzMzMzMyO7u7u7uyszMzMzMyMyMwIAEREREREREREREBEREREREREREaERGhoqVVfSUnWloqqnEhERAQEBAgAgIjMzMzMju7u7u7srMzMzMyIyMyMAABEREREREREREQERERERERERERERoaGhIVUn0lJ1IlKqpxIQEBAQESACAwAiIiIiIisiIiIiKyIiIiIzMyMCABAREREREREREREREBERERERERoRoREaGip1dyVSddJSpXcSEREBAREBIDIzAAAzM7K7u7u7u7syMzMzMyMCAAARERERERERERERERARERERERERERERoSIidXdVVXUiIlqnAhEREBABEQEgIjMzMzOyu7u7u7u7MjMzMyICAAAQEREREREREREREREBEREREREREREaoSEAIHdyVVV1WlVVdwIBAQEBEREQAjMiIiIisru7u7u7uyIiIiIwIwAAERERERERERERERERARERERERERERERoaAgByIlVVd1VVVXcCERAQEBAREQIzAiAjALK7u7u7u7sCMgIgMCMAERERESEiIiISEREREQERERERERERERGhoQIActJSVXdVVXV3AgEBAQEREBEhIwARAhGyu7u7u7u7AiAAADICEBERESFiZmZmJhIREREREBEREREREREiIiICIHcnLVJ3JSJ1dwIREBAQEBEREAIQISMQsru7u7u7uxIyAhEhABERERFiZmZmZmYmEREREREQEREREREiwlVVJVUiIt0iIiJSdXcCAAEBAQEBESEjACEjELKysrKysrISMgIRMgIQERERIWJmZmYmAhEREREREREREREhwnxVVXdVVVUi3d0iVXd3AhAQEBAQEBECMwIgIxASEhISEhISEjICITAjABEREWImIiIiYiYQEQERERERERERIcxcVcVXVXVVJSIiUlV3dwIAAQEiIiIiAjMiIiNCQkJCQkJCQkIyIiIiIiIiIiIhYmZmZiYSIiIiIiIiIiIiIsJ8d1XMVVVVV1VSd3VVdyciIiIiQUFBQQIzEiEjQUREREREREREMhLCzMzMLEREFCIiIiIiEURERERERERERCTMfFfHzHVVVXxVJXdVdXcnEREUFBQUFBQCMxJBEkRERERERERERCQhIiIiIsJCREQyEhEhI0FEREREREREREQkzHd3x8xXVVXFVSV3dXV3IhERQUERERERAjMSERIREREREREREREhEREREREiLBERMhJEJCMRERERERERERERIcx3d8d8dVdVxVUld1d3dxIRERERIiIiIjIzIiIiIiIiIiIiIiIiIiJEREREISwiIjIiIiIjIiIiIiIiIiIiIiLMfHzHfHd1VcxVJXd3dyIiIiIiIgAAAAAyMwIAAgAAAAAAAwAAACAgRERERCIsAAAyAgAgIwAAAAAAAAAwAAAwwnzMx3x3d3XMVSV3dycyMzMzAwAAAAAAICMAAAAAAAAAMAAAAAAAIiIiIiLCAgAAIAAAAAIAAAAAAAAAAAMAAMLMd8d8d1fHzHcnIiIiMzMzMzMAMzMzMyMjMzMzMzMzMzMzMzMzIyIiIiIiKTMzMyMzMzMyMzMzMzMzMzMzMzPCfMzHfHx3zMx3JzMzMzMzMzMzMwAAAAAgIwAAAAAAAAAAAAAAAAARERERIZICAAAAAAAAAAAAAAAAAAAAAAAAI8zMfMx3zMx8fCIzMzMzMzMzMwMAAAAAAAIAAGAAAAAAAAAAAAAARERERBSSAgAAAAAAAAAAAAAAAAAAAAAAADAiIiLMzMzMx8ciAwAzMzMzMzMDAAAAAAAAAAAGYAYAAAAAAAAAMEREREQkkgIAAAAAAAAAAAAAAAAAAAAAAAAAMyMyIyIizMwiMzMAAAAwMzMDADMzMzMzMzNjbDYzMzMzMzMzMyMiIiIiIikzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMyMiMjMzMzMzMzMzMzMAAAAAAABgxsxsZgYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAwAAAAAAMDMzMzMzMzMzMwAAAAAAAAAwAAAAAAAAAGBsBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMAAAAAAAAAADMzMzMzMzMAAAAAAAAAAAAAAAAAAAAABmAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAwAAAAAAAAAAAAAwMzMDAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMwAAAAAAAAAAAAAAMAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADADAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAANDddwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMwAAAAAAAAAAADMAIgIiIiIAAADAzAAAAAAAAAAAAN19fdcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AjAAAwMDMGJmasbMXMXMzMxmZmZmZmZqpmpmZmZmZmZmZmpmZmZqZmZmZmZmZmaqZmpmZmZmZmZmZmZmZmqmZiYAMDAwMABiZmqmZszMzMxmzGZmZmaqZmpmZmZmZmZmZqZmZmZmpmZmZmZmZmZmZmqmamZmZmZmZmZmZmZqpmYmAAMDMzMjZqZmamZmZmZsZmZsZmamZqZmZmZmZmZmZmZqZmZmZmZqZmZmZmZmZmamZqZmZmZmZmZmZmZmpmZqZjIzMzAwYmZqpmZmZmbGZmZmZmZmaqZqZmZmZmZmZmZmamZmZmZmamZmZmZmZmZmZqpmamZmZmZmZmZmZmZqpmYmAwMDA2JmaqZmZmZmZmZmZmZmpmZqZmZmZmZmZmZmpmZmZmZmZqZmZmZmZmZmZmZmaqZmZmZmZmZmZmZmaqZmJjAwMCBmpmZqZmZmZmZmZmZmZmqmZmZmZmZmZmZmZmpmZmZmZmZmamZmZmZmZmZmZqZmamZmZmZmZmZmZqZmOmYCAwNiZmqmZmZmZmZmZmZmZqZmamZmZmZmZmZmZmZqZmZmZmZmZmpmZmZmZmZmZmZmaqZmZmZmZmZmZmZmaqZmJjAwYmZqpmZmZmZmZmZmZmampqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqmZmZmZmZmZmZmZmqmZiYDI2amZmpmZmZmZmZmZmZmaqamZmZmZmZmZmZmamZmZmZmZmZmZmpmZmZmZmZmZqamZmpmZmZmZmZmZmamZmpmMmJmaqZmZmZmZmZmZmZmZmpqZqpmZmZmZmZmZmpmZmZmZmZmZmZqZmZmZmZmZqZqZmpqZmZmZmZmZmZmZmqmZiYHBg==";
+const PRESETS = {"pistol": "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IhEREiIRERIiETAAAAMRIiIREiIiIhESIiETAAADESIhERIhESIRESIhEwAAAxEiIREiERESIREiIRMAAAMRIiERIhEREiERIiETAAADESIhESIRERIhESIhEwAAAxEiIRESIREiEREiIRMAAAMRIiIREiIiIhESIiETAAAAMRIiERESIhEREiIRMAAAADESIiERERERESIiETAAAAAxESIiERERERIiIREwAAAAAxESIiIRERIiIhETAAAAAAAxESIiIiIiIiERMAAAAAAAAxESIiIiIiIREwAAAAAAAAAxERIiIiIRETAAAAAAAAAAAxERERERERMAAAAAAAAAAAAzMRERETMwAAAAAAAAAAAAAAMzMzMAAAAAAAAAAAAAAAAAREQAAAAAAAAAAAAAAAAAAEREAAAAAAAAAAAAAAAAAABERAAAAAAAAAAAAAAAAAAAREQAAAAAAAAAAAAAAAAAAEREAAAAAAAAAAIeICAMAAH/B+AxXP//Lv8UHiCjMo8yjzKPMo8yjzKPAAAAAAAABVVVVQAAAAAAAAAAAAAAVVERERFVUAAAAAAAAAAABREREUERERUAAAAAAAAAAFEREiJCIhERUAAAAAAAAAUREiIkNCIiERUAAAAAAABRQSIiJDQiIiERUAAAAAAFERRCIhQ0EiIiRBUAAAAAUREkNBEUNBESREERUAAAAFESIkNEQzNBRDQiEVAAAABREiIUM0MzRDNCIhFQAAAFESIiFDMzMzMzQiIhFQAABREiIRRDNVUzNBEiIRUAAAURIkRDM1VVU0RBIiEVAAAFFEQzMzNVVVMzNERBFQAABEQzMzMzVVVTMzMzNEQAAAURREQzMzVVMzM0REEVAAAFESIiREMzMzNEQiIhFQAAAFESIhFDMzMzNBIiEVAAAABREiIkMzNDMzQiIhFQAAAAUREiJDM0FEMzQiERUAAAAAUREiQzQREUQ0IRFQAAAAAAURFDRCIiIiQ0EVAAAAAAAAURRCIiIiIiRBUAAAAAAAAAVEESIiIiERFAAAAAAAAAAAQREREREREVAAAAAAAAAAAAVVERERFVUAAAAAAAAAAAAAAFVVVVAAAAAAAAAAAAAAAAAGZmAAAAAAAAAAAAAAAAAABmZgAAAAAAAAAAAAAAAAAAZmYAAAAAAAAAAAAAAAAAAGZmAAAAAAAAAAAAAAAAAABmZgAAAAAAAADYPQ==", "skateboard": "VEFNQUdPAFQAYQBtAGEATwBTACAAcwBrAGEAdABlAGIAbwBhAHIAZAAAAAAAAAAAAAAM5nRnMTZfYXMwMzMwMl8xAAAAAAAAAAAHhgIBgQQqAWCle/eToHJTDOYAAATyBOoE4ATzBOQE4QTuBOAE8QTjAAAAAAABIiIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAEAAAAgAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAIB4NAAH/B+Agozrefz99XzFFMUUxRTFFMUUxRTFFMUUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREREREREREREREQAAAAEiRERERERERERERCIQAAABIiIiIiIiIiIiIiIiEAAAABEREREREREREREREQAAAAAAAFVQAAAAAAVVAAAAAAAAAAEzMQAAAAATMxAAAAAAAAATMzMQAAABMzMxAAAAAAAAETMxEAAAARMzEQAAAAAAAAEREQAAAAARERAAAAADfjAkDAAB/wfgIKM63n1ffz///zFFMUUxRTFFMUUxRQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFVVVVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABVVVVQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREREREREREREREAAAABIjMzMzMzMzMzMzMzMzMzMzMzMyIQAAABIiIiIiIiIiIiIiIiIiIiIiIiIiIQAAAAEREREREREREREREREREREREREREAAAAAAABmYAAAAAAAAAAAAAAAAAZmAAAAAAAAAAFEQQAAAAAAAAAAAAAAABREEAAAAAAAABRERBAAAAAAAAAAAAAAAUREQQAAAAAAABFEQRAAAAAAAAAAAAAAARREEQAAAAAAAAEREQAAAAAAAAAAAAAAABEREAAAAE0C", "pizza": "VEFNQUdPAFQAYQBtAGEATwBTACAAcABpAHoAegBhAAAAAAAAAAAAAAAAAAAAAAAAAAAJ5nRnMTZfb3kwMzEwMV8xAAAAAAAAAAAFygIBgQEBApaofuBZl7CkDB0AAATvBOgE+QT5BOAAAAAAAAAAAAAAAAAAAAABAAABAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAEAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIiIiIiIiIiIgAAACREREREREREQgAAACREREREREREQgAAACIiIiIiIiIiIgAAAAARMxEREVERIAAAAAATMzERMxERAAAAAAADMzETMzESAAAAAAABMxETMzEQAAAAAAAAERERMxEgAAAAAAAAURMxEREAAAAAAAAAATMzERIAAAAAAAAAAjMzERIAAAAAAAAAABMxESAAAAAAAAAAACERESAAAAAAAAAAAAEVEgAAAAAAAAAAAAIREgAAAAAAAAAAAAARIAAAAAAAAAAAAAAhIAAAAAAAAAAAAAACAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAFCGBgOAAH/B+BGfyCjKVkz2aefp5+nn6efp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIiIiIiIiIiIgAAACREREREREREQgAAACREREREREREQgAAACIiIiIiIiIiIgAAAAARMxEREVERIAAAAAATMzERMxERAAAAAAADMzETMzESAAAAAAABMxETMzEQAAAAAAAAERERMxEgAAAAAAAAURMxEREAAAAAAAAAATMzERIAAAAAAAAAAjMzERIAAAAAAAAAABMxESAAAAAAAAAAACERESAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE8GBgLAAH/B+AgozPZRn8pWaefp5+nn6efp5+nnwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREREREREREQAAABIiIiIiIiIiIQAAABIiIiIiIiIiIQAAABEREREREREREQAAAAAzRDMzM1MzEAAAAAA0REMzRDMzAAAAAAAEREM0REMxAAAAAAADAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGnq", "burger": "VEFNQUdPAFQAYQBtAGEATwBTACAAYgB1AHIAZwBlAHIAAAAAAAAAAAAAAAAAAAAAAAAKMHRnMTZfZ2gwMzIwMV8xAAAAAAAAAAAF3AIBgQEBAWhOdZ9ImaZ8DIEAAAThBPQE8QTmBOQE8QAAAAAAAAAAAAAAAAABAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwFGGBgQAAH/B+BFHSCjKg9EvEXrPp/Xv9e/17/Xv9e/17/Xv9e/178AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAiIiIAAAAAAAAAAiIREREiIAAAAAAAIRERFxEREgAAAAACERcRERERESAAAAAhERERERFxERIAAAIhEREXERERERIgAAIREREREREREREgAAVVVVVVVVVVVVVQAAVVVVVVVVVVVVVQAABmZmZmZmZmZmYAAAIzMzMzMzMzMzMgAAIzMzMzMzMzMzMgAAIzMzMzMzMzMzMgAAIiIiIiIiIiIiIgAAAkREREREREREIAAAJEREREREREREQgAAIkREREREREREIgAAAiIiIiIiIiIiIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABRhgYEAAB/wfgRR0go0S8Kg9F6z6f17/Xv9e/17/Xv9e/17/Xv9e/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIiIiAAAAAAAAAAIiERERIiAAAAAAACERERcRERIAAAAAAhEXEREREREgAAAAIRERERERcREAAAACIRERFxERERAAAAACEREREREREQAAAAAFVVVVVVVVVQAAAAAFVVVVVVVVVQAAAAAAZmZmZmZmZgAAAAACRERERERERAAAAAACREREREREREAAAAACREREREREREQAAAACIiIiIiIiIiIgAAAAIzMzMzMzMzMyAAACMzMzMzMzMzMzIAACIzMzMzMzMzMyIAAAIiIiIiIiIiIiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUYYGBAAAf8H4CCjRR0qD0S8Res+n9e/17/Xv9e/17/Xv9e/17/XvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABEREAAAAAAAAAABESIiAAAAAAAAAAASIiIgAAAAAAAAAAEiJyIAAAAAAAAAABIiIiIAAAAAAAAAARIiIicAAAAAAAAAASIiIiIAAAAAAAAABVVVVVUAAAAAAAAABVVVVVVQAAAAAAAAAGZmZmZmAAAAAAAAATMzMzMzAAAAAAAAATMzMzMwAAAAAAAAATMzMzMwAAAAAAAAAREREREQAAAAAAAAABRERERAAAAAAAAAAURERERAAAAAAAAAARREREREAAAAAAAAABEREREREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKBM"};
+const SVC = "0000fff0-0000-1000-8000-00805f9b34fb";
+const WRITE = "0000fff2-0000-1000-8000-00805f9b34fb";
+const NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb";
+function describe(e) {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  if (e && typeof e === "object") { try { return JSON.stringify(e); } catch {} }
+  return `${typeof e} ${String(e)}`;
+}
+const SENDER_ID = [0x7c,0x68,0x48,0x97,0x75,0xa6,0x4e,0x99];
+const START = Uint8Array.of(0xf0,0x8d), END = Uint8Array.of(0xf0,0xcd), YOUR_TURN = Uint8Array.of(0xf0,0x8e,0x0d);
+const CONTROL = new Set([0x0c,0x0d,0x4d,0x8d,0xcd,0x8e]);
+
+const $ = id => document.getElementById(id);
+const logLines = [];
+const t0 = performance.now();
+const hex = u8 => Array.from(u8, b => b.toString(16).padStart(2,"0")).join("");
+function log(s) {
+  logLines.push(((performance.now()-t0)/1000).toFixed(3).padStart(8) + "  " + s);
+  const box = $("logBox");
+  box.textContent = logLines.slice(-400).join("\n");
+  box.scrollTop = box.scrollHeight;
+}
+function lcd(state, main) { if (state) $("lcdState").textContent = state; if (main !== undefined) $("lcdMain").textContent = main; }
+function progress(p) { const v = Math.max(0, Math.min(100, Math.round(p))); $("barFill").style.width = v + "%"; $("lcdPct").textContent = v + "%"; }
+function show(el, text, kind) { el.hidden = false; el.className = "msg " + (kind||""); el.textContent = text; }
+
+// ---------- message building (matches the MyMeets bytes exactly) ----------
+// Layout taken from MyMeets' own message builder:
+//   0x48 u32 total length · 0x4c operand 0x17 · 0x52 8-byte security code
+//   0x5e COMMAND (0x00 hello, 0x3a send item; the Tama answers with command + 1)
+//   0xbb 0x03 marker + 0xbc u32 Gotchi Points (only when points > 0; MyMeets allows up to 99,999)
+//   0xd4 u32 256 when an item is attached · 0xf8 format code
+const CMD_HELLO = 0x00, CMD_ITEM = 0x3a, MAX_POINTS = 99999;
+function header(totalLen, command, points, hasItem) {
+  const h = new Uint8Array(0x100), dv = new DataView(h.buffer);
+  h.set([0x54,0x41,0x4d,0x41,0x47,0x4f], 0);           // "TAMAGO"
+  dv.setUint32(0x48, totalLen, true);
+  h[0x4c] = 0x17;
+  h.set(SENDER_ID, 0x52);
+  h[0x5e] = command;
+  if (points > 0) { h[0xbb] = 0x03; dv.setUint32(0xbc, points, true); }
+  if (hasItem) dv.setUint32(0xd4, 256, true);
+  h.set([0x10,0x00,0x01,0x04], 0xfc);
+  return h;
+}
+function finish(body) {
+  let s = 0; for (const b of body) s = (s + b) & 0xffff;
+  const out = new Uint8Array(body.length + 2); out.set(body); out[body.length] = s & 0xff; out[body.length+1] = s >> 8;
+  return out;
+}
+function helloMsg() { return finish(header(0x102, CMD_HELLO, 0, false)); }
+function itemMsg(item, points) {
+  const tail = new Uint8Array(12 + item.length + 4), dv = new DataView(tail.buffer);
+  dv.setUint32(0, 2, true); dv.setUint32(4, 1, true); dv.setUint32(8, item.length, true);
+  tail.set(item, 12);
+  const total = 0x100 + tail.length + 2;
+  const body = new Uint8Array(0x100 + tail.length); body.set(header(total, CMD_ITEM, points, true)); body.set(tail, 0x100);
+  return finish(body);
+}
+function itemInfo(item) {
+  if (item.length < 0x4a || String.fromCharCode(...item.slice(0,6)) !== "TAMAGO") return null;
+  let name = ""; for (let i = 6; i + 1 < 0x32; i += 2) { const c = (item[i] << 8) | item[i+1]; if (!c) break; name += String.fromCharCode(c); }
+  let id = ""; for (let i = 0x34; i < 0x4a && item[i]; i++) id += String.fromCharCode(item[i]);
+  return { name, id };
+}
+// Wallpaper items: shop price is a big-endian u16 at 0x76; the last 2 bytes are a
+// big-endian checksum (sum of every earlier byte & 0xffff). Verified on tg19_bg50001.
+function isWallpaper(item) {
+  return item.length === 0x222a && item[0x200 + 4] === 0x80 && item[0x200 + 5] === 0x80;
+}
+function itemChecksum(item) { let s = 0; for (let i = 0; i < item.length - 2; i++) s = (s + item[i]) & 0xffff; return s; }
+function withPrice(item, price) {
+  const out = item.slice();
+  out[0x76] = (price >> 8) & 0xff; out[0x77] = price & 0xff;
+  const c = itemChecksum(out); out[out.length - 2] = c >> 8; out[out.length - 1] = c & 0xff;
+  return out;
+}
+function replyCommand(status) {
+  return status.length >= 0x60 && String.fromCharCode(...status.slice(0,6)) === "TAMAGO" ? status[0x5e] : null;
+}
+
+// ---------- wallpaper codec ----------
+// 128x128 wallpaper item layout (decoded from tg19_bg50001):
+//   0x006 UTF-16BE name (22 chars max)   0x034 ASCII asset ID "tg19_bgNNNNN"
+//   0x05a u16 BE wallpaper number (0xc351 = 50001, matches the ASCII ID)   0x076 u16 BE shop price
+//   0x200 image header "00 01 20 24 80 80 0f 00 01 ff" (0x80 0x80 = 128x128)
+//   0x20a palette: 15 colors, u16 big-endian BGR565
+//   0x228 pixels: 4 bits each, 2 per byte, left pixel in the high nibble, rows top to bottom
+//   last 2 bytes: u16 BE sum of every earlier byte
+const PAL_AT = 0x20a, PAL_N = 15, PIX_AT = 0x228;
+function bgr565ToRgb(v) { const b = (v >> 11) & 31, g = (v >> 5) & 63, r = v & 31; return [r * 255 / 31 | 0, g * 255 / 63 | 0, b * 255 / 31 | 0]; }
+function rgbToBgr565(r, g, b) { return ((b >> 3) << 11) | ((g >> 2) << 5) | (r >> 3); }
+function decodeWallpaper(item) {
+  const pal = []; for (let i = 0; i < PAL_N; i++) pal.push(bgr565ToRgb((item[PAL_AT + 2*i] << 8) | item[PAL_AT + 2*i + 1]));
+  pal.push([0, 0, 0]);
+  const out = new ImageData(128, 128);
+  for (let i = 0; i < 8192; i++) {
+    const b = item[PIX_AT + i];
+    for (const [k, n] of [[0, b >> 4], [1, b & 15]]) { const c = pal[n], o = (i * 2 + k) * 4; out.data[o] = c[0]; out.data[o+1] = c[1]; out.data[o+2] = c[2]; out.data[o+3] = 255; }
+  }
+  return out;
+}
+function drawPreview(imgData, label) {
+  const cv = $("preview"); cv.getContext("2d").putImageData(imgData, 0, 0);
+  $("previewLabel").textContent = label; $("previewBox").hidden = false;
+}
+// Median cut on 5-6-5 values, then nearest-color mapping with optional Floyd-Steinberg.
+function quantize(rgba, n, dither) {
+  const px = []; for (let i = 0; i < rgba.length; i += 4) px.push([rgba[i], rgba[i+1], rgba[i+2]]);
+  let boxes = [px.slice()];
+  while (boxes.length < n) {
+    let bi = -1, best = -1, ch = 0;
+    boxes.forEach((bx, i) => { if (bx.length < 2) return; for (let c = 0; c < 3; c++) { let lo = 255, hi = 0; for (const p of bx) { if (p[c] < lo) lo = p[c]; if (p[c] > hi) hi = p[c]; } const span = (hi - lo) * Math.sqrt(bx.length); if (span > best) { best = span; bi = i; ch = c; } } });
+    if (bi < 0 || best <= 0) break;
+    const bx = boxes[bi].sort((a, b) => a[ch] - b[ch]); const mid = bx.length >> 1;
+    boxes.splice(bi, 1, bx.slice(0, mid), bx.slice(mid));
+  }
+  let pal = boxes.map(bx => { const s = [0,0,0]; for (const p of bx) { s[0]+=p[0]; s[1]+=p[1]; s[2]+=p[2]; } return s.map(v => Math.round(v / bx.length)); });
+  pal = pal.map(([r,g,b]) => bgr565ToRgb(rgbToBgr565(r,g,b)));           // snap to what the screen can show
+  while (pal.length < n) pal.push([0,0,0]);
+  const near = (r,g,b) => { let bi = 0, bd = 1e9; pal.forEach((c, i) => { const d = (c[0]-r)**2*0.30 + (c[1]-g)**2*0.59 + (c[2]-b)**2*0.11; if (d < bd) { bd = d; bi = i; } }); return bi; };
+  const W = 128, f = Float32Array.from(px.flat()), idx = new Uint8Array(W*W);
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    const o = (y*W + x)*3, r = f[o], g = f[o+1], b = f[o+2];
+    const k = near(Math.max(0,Math.min(255,r)), Math.max(0,Math.min(255,g)), Math.max(0,Math.min(255,b))); idx[y*W + x] = k;
+    if (!dither) continue;
+    const e = [r - pal[k][0], g - pal[k][1], b - pal[k][2]];
+    const push = (dx, dy, w) => { const xx = x+dx, yy = y+dy; if (xx < 0 || xx >= W || yy >= W) return; const q = (yy*W + xx)*3; f[q]+=e[0]*w; f[q+1]+=e[1]*w; f[q+2]+=e[2]*w; };
+    push(1,0,7/16); push(-1,1,3/16); push(0,1,5/16); push(1,1,1/16);
+  }
+  return { pal, idx };
+}
+// The Tama shows names in its own font: a = 0x04e0 ... z = 0x04f9, stored at 0x5e (up to 11 letters).
+function setDisplayName(out, text) {
+  for (let i = 0x5e; i < 0x76; i++) out[i] = 0;
+  [...text.toLowerCase()].filter(c => c >= "a" && c <= "z").slice(0, 11)
+    .forEach((c, i) => { const v = 0x04e0 + c.charCodeAt(0) - 97; out[0x5e + 2*i] = v >> 8; out[0x5f + 2*i] = v & 255; });
+}
+function buildWallpaper(template, pal, idx, name, idNum, displayName) {
+  const out = template.slice();
+  setDisplayName(out, displayName === undefined ? name : displayName);
+  const assetId = "tg19_bg" + idNum;
+  out[0x5a] = (idNum >> 8) & 255; out[0x5b] = idNum & 255;
+  for (let i = 0x06; i < 0x32; i++) out[i] = 0;
+  [...name].slice(0, 21).forEach((ch, i) => { const c = ch.charCodeAt(0); out[0x06 + 2*i] = c >> 8; out[0x07 + 2*i] = c & 255; });
+  for (let i = 0x34; i < 0x4a; i++) out[i] = 0;
+  [...assetId].slice(0, 21).forEach((ch, i) => { out[0x34 + i] = ch.charCodeAt(0); });
+  pal.slice(0, PAL_N).forEach(([r,g,b], i) => { const v = rgbToBgr565(r,g,b); out[PAL_AT + 2*i] = v >> 8; out[PAL_AT + 2*i + 1] = v & 255; });
+  for (let i = 0; i < 8192; i++) out[PIX_AT + i] = (idx[2*i] << 4) | idx[2*i + 1];
+  const c = itemChecksum(out); out[out.length-2] = c >> 8; out[out.length-1] = c & 255;
+  return out;
+}
+
+// ---------- generic item frames (food, toys, wallpapers) ----------
+// 0x200: u16 frame count; each frame: u16 size, then w, h, colors, 3 bytes, palette (u16 BE BGR565), 4-bit pixels.
+function itemFrames(item) {
+  let o = 0x200; const n = (item[o] << 8) | item[o+1]; o += 2; const out = [];
+  for (let f = 0; f < n && o + 2 < item.length; f++) {
+    const size = (item[o] << 8) | item[o+1], b = o + 2;
+    const w = item[b], h = item[b+1], nc = item[b+2];
+    const pal = []; for (let i = 0; i < nc; i++) pal.push(bgr565ToRgb((item[b+6+2*i] << 8) | item[b+7+2*i]));
+    const img = new ImageData(w, h), pix = b + 6 + 2*nc;
+    for (let i = 0; i < w*h; i++) {
+      const byte = item[pix + (i >> 1)], k = (i & 1) ? byte & 15 : byte >> 4;
+      if (k === 0) continue;                                  // slot 0 is see-through
+      const c = pal[k] || [0,0,0]; img.data.set([c[0], c[1], c[2], 255], i*4);
+    }
+    out.push(img); o += 2 + size;
+  }
+  return out;
+}
+const presetBytes = {};
+for (const [k, b64] of Object.entries(PRESETS)) presetBytes[k] = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+function animate() {
+  document.querySelectorAll("canvas[data-anim]").forEach(cv => {
+    const frames = itemFrames(presetBytes[cv.dataset.anim]).map(img => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; c.getContext("2d").putImageData(img, 0, 0); return c; });
+    const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; let i = 0;
+    const draw = () => {
+      const f = frames[i % frames.length]; ctx.clearRect(0, 0, cv.width, cv.height);
+      const s = Math.max(1, Math.floor(Math.min(cv.width / f.width, cv.height / f.height)));
+      ctx.drawImage(f, (cv.width - f.width*s) / 2, (cv.height - f.height*s) / 2, f.width*s, f.height*s); i++;
+    };
+    draw();
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(draw, 600);
+  });
+}
+
+// ---------- item selection ----------
+const builtin = Uint8Array.from(atob(BG50001_B64), c => c.charCodeAt(0));
+let fileItem = null, photoItem = null, photoBitmap = null;
+try { const saved = parseInt(localStorage.getItem("tamaos_next_id"), 10); if (saved >= 50012 && saved <= 65535) document.getElementById("wpId").value = saved; } catch {}
+function photoIdNum() { return Math.max(50012, Math.min(65535, parseInt($("wpId").value, 10) || 51001)); }
+function selectedSrc() { const r = document.querySelector('input[name="src"]:checked'); return r ? r.value : "builtin"; }
+function currentItem() {
+  const v = selectedSrc();
+  if (v.startsWith("preset:")) return presetBytes[v.slice(7)];
+  return v === "file" ? fileItem : v === "photo" ? photoItem : builtin;
+}
+function refreshItem() {
+  $("photoOpts").hidden = !$("srcPhoto").checked;
+  const item = currentItem();
+  if (!item) { $("lcdItem").textContent = $("srcPhoto").checked ? "no photo" : "no file"; $("itemInfo").hidden = true; $("previewBox").hidden = !$("srcPhoto").checked; return; }
+  const info = itemInfo(item);
+  $("lcdItem").textContent = info ? info.id : "?";
+  if ($("srcFile").checked) show($("itemInfo"), info ? `${info.name} · ${info.id} · ${item.length.toLocaleString()} bytes` : "", "ok");
+  else $("itemInfo").hidden = true;
+  if (isWallpaper(item)) drawPreview(decodeWallpaper(item), $("srcPhoto").checked ? "Preview of what the Tama will show (15 colors)" : `${info ? info.id : "Wallpaper"} as stored in the file`);
+  else $("previewBox").hidden = true;
+}
+function rebuildPhoto() {
+  if (!photoBitmap) { photoItem = null; refreshItem(); return; }
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  const ctx = cv.getContext("2d");
+  const s = Math.min(photoBitmap.width, photoBitmap.height);
+  ctx.drawImage(photoBitmap, (photoBitmap.width - s) / 2, (photoBitmap.height - s) / 2, s, s, 0, 0, 128, 128);
+  const { pal, idx } = quantize(ctx.getImageData(0, 0, 128, 128).data, PAL_N, $("dither").checked);
+  photoItem = buildWallpaper(builtin, pal, idx, $("wpName").value || "TamaOS photo", photoIdNum());
+  log(`Photo converted: tg19_bg${photoIdNum()}, ${pal.length} colors`);
+  refreshItem();
+}
+$("photoIn").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  $("srcPhoto").checked = true;
+  const img = new Image();
+  img.onload = () => { photoBitmap = img; rebuildPhoto(); };
+  img.onerror = () => show($("itemInfo"), "That picture couldn't be opened. Try a JPG or PNG.", "bad");
+  img.src = URL.createObjectURL(f);
+});
+$("dither").addEventListener("change", rebuildPhoto);
+$("wpName").addEventListener("change", rebuildPhoto);
+$("wpId").addEventListener("change", rebuildPhoto);
+$("srcPhoto").addEventListener("change", refreshItem);
+document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("change", refreshItem));
+animate();
+$("fileIn").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const buf = new Uint8Array(await f.arrayBuffer());
+  $("srcFile").checked = true;
+  if (!itemInfo(buf)) { fileItem = null; show($("itemInfo"), `${f.name} isn't a Tamagotchi item (no TAMAGO header). Use a MyMeets item .txt file.`, "bad"); $("lcdItem").textContent = "bad file"; return; }
+  fileItem = buf; refreshItem();
+});
+$("srcBuiltin").addEventListener("change", refreshItem);
+$("srcFile").addEventListener("change", refreshItem);
+refreshItem();
+
+// ---------- Bluetooth link ----------
+class Link {
+  constructor(tx, rx) { this.tx = tx; this.rx = rx; this.q = []; this.waiters = []; }
+  async start() {
+    this.rx.addEventListener("characteristicvaluechanged", e => {
+      const dv = e.target.value;
+      const v = new Uint8Array(dv.byteLength); for (let i = 0; i < dv.byteLength; i++) v[i] = dv.getUint8(i);
+      log("RX " + hex(v));
+      const w = this.waiters.shift(); if (w) w(v); else this.q.push(v);
+    });
+    log("step: start notifications");
+    await this.rx.startNotifications();
+    await sleep(300);
+  }
+  next(ms) {
+    if (this.q.length) return Promise.resolve(this.q.shift());
+    return new Promise((res, rej) => {
+      const fn = v => { clearTimeout(t); res(v); };
+      const t = setTimeout(() => { const i = this.waiters.indexOf(fn); if (i >= 0) this.waiters.splice(i,1); rej(new Error("timeout")); }, ms);
+      this.waiters.push(fn);
+    });
+  }
+  async w(data) {
+    if (this.mode === undefined) {
+      this.mode = this.tx.writeValueWithoutResponse ? "noresp" : "plain";
+      log(`write mode: ${this.mode}`);
+    }
+    if (this.mode === "noresp") {
+      try { await this.tx.writeValueWithoutResponse(data); return; }
+      catch (e) { log(`writeValueWithoutResponse failed (${describe(e)}), switching to writeValue`); this.mode = "plain"; }
+    }
+    await this.tx.writeValue(data);
+  }
+  async send(msg, label, pace, onPct) {
+    this.q.length = 0;
+    log(`TX start ${label} (${msg.length} bytes)`);
+    await this.w(START); await sleep(50);
+    const n = Math.ceil(msg.length / 20);
+    let deadline = performance.now();
+    for (let i = 0; i < n; i++) {
+      await this.w(msg.slice(i*20, (i+1)*20));
+      deadline += pace;
+      const wait = deadline - performance.now(); if (wait > 0) await sleep(wait);
+      if (onPct) onPct((i+1) / n * 100);
+    }
+    await this.w(END);
+    log(`TX end ${label}`);
+    let ack;
+    try { ack = await this.next(45000); } catch { throw new Error(`The Tama didn't confirm the ${label}. It may have timed out; try a higher pace.`); }
+    if (!(ack[0] === 0xf0 && ack[1] === 0x0c)) throw new Error(`The Tama didn't accept the ${label} (got ${hex(ack)}).`);
+  }
+  async reply() {
+    log("TX your-turn"); await this.w(YOUR_TURN);
+    const data = [];
+    for (;;) {
+      let p;
+      try { p = await this.next(30000); } catch { throw new Error("The Tama stopped answering before it finished its reply."); }
+      if (p.length <= 8 && p[0] === 0xf0 && CONTROL.has(p[1])) { if (p[1] === 0x4d) break; continue; }
+      data.push(...p);
+    }
+    try { for (;;) await this.next(400); } catch {}
+    return Uint8Array.from(data);
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- main flow ----------
+if (!navigator.bluetooth) {
+  show($("support"), "This browser can't use Bluetooth here. Open this page directly in Chrome on Android (copy the link and paste it into Chrome), then try again.", "warn");
+}
+$("goBtn").addEventListener("click", async () => {
+  let item = currentItem();
+  const result = $("result"); result.hidden = true;
+  if (!item) { show(result, "Choose an item file first.", "bad"); return; }
+  if ($("setPrice").checked) {
+    if (isWallpaper(item)) {
+      const price = Math.max(0, Math.min(65535, parseInt($("price").value, 10) || 0));
+      item = withPrice(item, price);
+      log(`Shop price set to ${price} (was ${(currentItem()[0x76] << 8) | currentItem()[0x77]})`);
+    } else log("Not a 128x128 wallpaper, price left unchanged");
+  }
+  const points = Math.max(0, Math.min(MAX_POINTS, parseInt($("pts").value, 10) || 0));
+  $("pts").value = points; $("lcdPts").textContent = `+${points} PTS`;
+  const pace = Math.max(10, Math.min(200, parseInt($("delay").value, 10) || 40));
+  if (!navigator.bluetooth) { show(result, "Bluetooth isn't available in this view. Open the page in Chrome on Android.", "bad"); return; }
+
+  $("goBtn").disabled = true; progress(0);
+  let device;
+  try {
+    lcd("SEARCH", "Pick TMGC_meets");
+    log("step: choose device");
+    try {
+      device = await navigator.bluetooth.requestDevice({ filters: [{ name: "TMGC_meets" }, { namePrefix: "TMGC" }], optionalServices: [SVC] });
+    } catch (e) {
+      if (e && e.name === "NotFoundError") throw e;
+      log(`filtered search failed (${describe(e)}), showing all devices`);
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [SVC] });
+    }
+    log(`picked: ${device.name || "(no name)"} ${device.id || ""}`);
+    lcd("LINK", "Connecting...");
+    log("step: connect");
+    const server = await device.gatt.connect();
+    log("step: find service fff0");
+    const svc = await server.getPrimaryService(SVC);
+    log("step: find characteristics fff2 / fff1");
+    const link = new Link(await svc.getCharacteristic(WRITE), await svc.getCharacteristic(NOTIFY));
+    await link.start();
+
+    lcd("HELLO", "Saying hello...");
+    await link.send(helloMsg(), "hello", pace);
+    log(`hello answered with command ${replyCommand(await link.reply())}`);
+
+    lcd("SEND", "Sending item...");
+    await link.send(itemMsg(item, points), "item", pace, progress);
+    lcd("WAIT", "Tama is saving...");
+    const ack = replyCommand(await link.reply());
+    log(`item answered with command ${ack}${ack === CMD_ITEM + 1 ? " (accepted)" : ""}`);
+    progress(100);
+    lcd("DONE", "Sent! Check your Tama");
+    if ($("srcPhoto").checked) {
+      const next = Math.min(65535, photoIdNum() + 1);
+      $("wpId").value = next; try { localStorage.setItem("tamaos_next_id", String(next)); } catch {}
+      log(`Next photo will use number ${next}`);
+      rebuildPhoto();
+    }
+    show(result, `Sent. Check your Tamagotchi.${points ? ` ${points.toLocaleString()} Gotchi Points were included.` : ""}`, "ok");
+    log("Done");
+  } catch (e) {
+    const msg = e && e.name === "NotFoundError" ? "No Tamagotchi picked. Do the APP → Download trick, then tap Connect & send while it's waiting."
+      : e && e.name === "SecurityError" ? "Bluetooth is blocked in this viewer. Open this page in Chrome on Android and try again."
+      : `Stopped at the last "step" in the log. Details: ${describe(e)}`;
+    lcd("ERROR", "Transfer failed");
+    show(result, msg, "bad");
+    log("Error: " + describe(e));
+  } finally {
+    try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
+    $("goBtn").disabled = false;
+  }
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  const text = logLines.join("\n") || "(empty)";
+  try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy log", 1500); }
+  catch { const r = document.createRange(); r.selectNodeContents($("logBox")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+});
+log("Ready. Built-in item: tg19_bg50001");
+</script>
+
+</body>
+</html>
