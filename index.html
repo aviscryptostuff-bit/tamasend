@@ -219,6 +219,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
             <input type="number" id="cheatHappy" min="0" max="100" value="100"><small>0 to 100.</small></label>
           <label class="f" for="cheatHunger">Stats potion: hunger
             <input type="number" id="cheatHunger" min="0" max="99" value="6"><small>Fullness. Bolter's uses 6.</small></label>
+          <label class="f" for="cheatGrowth">Time potion does
+            <select id="cheatGrowth">
+              <option value="inc">+1 growth stage (original)</option>
+              <option value="0">Set to 0 (baby)</option>
+              <option value="1">Set to 1 (child)</option>
+              <option value="2">Set to 2</option>
+              <option value="3">Set to 3</option>
+              <option value="4">Set to 4 (grown)</option>
+            </select><small>Setting a stage can take a baby straight to adult. 2+ is usually old enough to marry.</small></label>
           <label class="f">Time potion
             <small>Unchanged: each use moves your Tama up one growth stage.</small></label>
         </div>
@@ -636,7 +645,7 @@ function customItem() {
 //   0x7a0  .word 99999  -> coins potion: Gotchi Points value
 //   0x5e   shop name (mojis); trailing u16 big-endian checksum of all earlier bytes
 let magicHut = null, cheatItem = null;
-const CHEAT_CHECK = [[0x600, 0xe3a01064], [0x60c, 0xe3a01006], [0x7a0, 0x0001869f], [0x5fc, 0xe92d4010], [0x788, 0xe92d4010]];
+const CHEAT_CHECK = [[0x600, 0xe3a01064], [0x60c, 0xe3a01006], [0x7a0, 0x0001869f], [0x5cc, 0xe2851001], [0x5fc, 0xe92d4010], [0x788, 0xe92d4010]];
 async function rebuildCheat() {
   try {
     if (!magicHut) { const r = await fetch("community/magic_hut.txt"); if (!r.ok) throw new Error(`HTTP ${r.status}`); magicHut = new Uint8Array(await r.arrayBuffer()); }
@@ -647,17 +656,20 @@ async function rebuildCheat() {
     const happy = Math.max(0, Math.min(100, parseInt($("cheatHappy").value, 10) || 0));
     const hunger = Math.max(0, Math.min(99, parseInt($("cheatHunger").value, 10) || 0));
     $("cheatCoins").value = coins; $("cheatHappy").value = happy; $("cheatHunger").value = hunger;
+    const growth = $("cheatGrowth").value;
     dv.setUint32(0x7a0, coins, true);
     out[0x600] = happy; out[0x60c] = hunger;
+    // Time potion: keep Bolter's "+1" (0x5cc add r1,r5,#1) or set an exact stage (mov r1,#N).
+    if (growth !== "inc") { const n = parseInt(growth, 10) & 0xff; out[0x5cc] = n; out[0x5cd] = 0x10; out[0x5ce] = 0xa0; out[0x5cf] = 0xe3; }
     const name = ($("cheatName").value || "CHEAT HUT").toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, 11) || "CHEAT HUT";
     out.fill(0, 0x5e, 0x76); out.set(toMojis(name).subarray(0, 24), 0x5e);
     const c = itemChecksum(out); out[out.length - 2] = c >> 8; out[out.length - 1] = c & 0xff;
     cheatItem = out;
-    log(`Cheat Hut built: "${name}", coins ${coins}, happiness ${happy}, hunger ${hunger}`);
+    log(`Cheat Hut built: "${name}", coins ${coins}, happiness ${happy}, hunger ${hunger}, time potion ${growth}`);
   } catch (e) { cheatItem = null; show($("itemInfo"), `Couldn't build the Cheat Hut (${describe(e)}).`, "bad"); }
   refreshCustom();
 }
-["cheatName", "cheatCoins", "cheatHappy", "cheatHunger"].forEach(id => $(id).addEventListener("change", rebuildCheat));
+["cheatName", "cheatCoins", "cheatHappy", "cheatHunger", "cheatGrowth"].forEach(id => $(id).addEventListener("change", rebuildCheat));
 $("srcCheat").addEventListener("change", rebuildCheat);
 function refreshCustom() {
   $("photoOpts").hidden = !$("srcPhoto").checked;

@@ -525,4 +525,6 @@ Every variable the Magic Hut writes, recovered by disassembling all its routines
 
 The site's **Cheat Hut** (Custom tab) now patches the high-confidence ones to any value — **coins, happiness, hunger** — reusing Bolter's proven code (only the value immediates change: coins `0x7a0`, happiness `0x600`, hunger `0x60c`), with the checksum fixed. Each build is checked in the sandbox before it's considered good.
 
-The time/growth potion (var4 +1) and the two unknown toggles ride along in the same file (they're Bolter's untouched routines). Setting growth to an exact stage, or decoding the unknowns/age/weight/character, needs either custom code injected into a routine (doable with the verifier, not yet done) or the full emulator to watch the effect.
+The **Cheat Hut** now also sets the **time potion** to an exact growth stage: it patches one instruction at `0x5cc` (`add r1,r5,#1` -> `mov r1,#N`) so the potion sets growth to N instead of +1. This can take a baby straight to adult (2+ is usually marriageable). Verified in the sandbox: baby(0) -> stage 2 and stage 4, and the untouched "+1" path still steps 0->1->2->3. This is the first *logic* change (not just a value), still done by swapping one proven instruction, so risk stays low.
+
+Decoding the unknown toggles, age, weight or character still needs the full emulator to watch the effect.
