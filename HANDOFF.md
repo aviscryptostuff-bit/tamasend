@@ -580,6 +580,8 @@ Everything here was checked in the **nijiiro-egg** emulator running the magic-gr
 
 ### Our first program: `items/tamaos_demo.txt` (built by `tools/make_demo.py`)
 
+> **WARNING (2026-11-11, real device): do not send `items/tamaos_demo.txt`.** It installs on a real ON Magic EN Tama, but when the travel / go-out menu tries to draw its preview the Tama **freezes and beeps continuously** (reset button needed). The file has code only, with none of the preview/name sections the travel menu reads. It was removed from the site's Community mods list on 2026-11-11. The file stays in the repo as the reproduction case.
+
 - A **location** (`tg18_ode19001`, shown as "tamaos"), 17.8 KB, written from scratch in ARM assembly (keystone).
 - It draws a full-screen animated plasma, a 2-frame walking pixel character bouncing around, and a scrolling banner, straight into the framebuffer. A, B or C exits (it also exits after ~1500 frames).
 - It only writes the framebuffer and calls the API stubs above. It never writes flash or the pet save.
